@@ -7,6 +7,7 @@ interface Props {
   rosterId: number;
   token: string;
   roster?: Roster;
+  filterPosition?: "all" | "rn" | "pn";
 }
 
 interface Interval {
@@ -230,7 +231,7 @@ export function computeRosterDailyLeaves(roster: Roster | undefined, dates: stri
   return map;
 }
 
-export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
+export function CoverageSummaryRow({ dates, rosterId, token, roster, filterPosition = "all" }: Props) {
   const [, setDaily] = useState<Record<string, Daily>>({});
   const [loading, setLoading] = useState(false);
 
@@ -279,9 +280,17 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-extrabold text-slate-900">{period.label}</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">RN</span>
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">PN</span>
-                    <span className="text-[9px] font-semibold text-slate-400 ml-1">รวม</span>
+                    {filterPosition === "all" ? (
+                      <>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">RN</span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">PN</span>
+                        <span className="text-[9px] font-semibold text-slate-400 ml-1">รวม</span>
+                      </>
+                    ) : filterPosition === "rn" ? (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-teal-100 text-teal-800 border border-teal-300">เฉพาะ RN</span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300">เฉพาะ PN</span>
+                    )}
                   </div>
                 </div>
               </th>
@@ -296,8 +305,6 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
                 const target = comp ? comp.target : 0;
 
                 // For Night period (00:00 - 08:00): calculate deficit from immediately preceding shift (Yesterday Evening: 16:00 - 24:00)
-                // Night shift can reach Target + PrevEveDeficit (e.g. 4 + 0.5 = 4.5) without being marked as overstaffed.
-                // But exceeding 4.5 (e.g. 5.0) will be flagged as overstaffed.
                 const prevDate = dateIdx > 0 ? dates[dateIdx - 1] : "";
                 const compPrevEve = prevDate ? computedDaily[prevDate]?.["afternoon"] : undefined;
                 const eveDeficitRN = period.key === "night" && compPrevEve ? Math.max(0, (compPrevEve.targetRN || 0) - (compPrevEve.actualRN || 0)) : 0;
@@ -323,13 +330,16 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
                   : (target > 0 && actual < target - 0.001);
                 const isTotalOver = target > 0 && actual > maxAllowedTotal + 0.001;
 
+                const isHighlightedOver = filterPosition === "rn" ? isOverRN : filterPosition === "pn" ? isOverPN : isTotalOver;
+                const isHighlightedShort = filterPosition === "rn" ? isShortRN : filterPosition === "pn" ? isShortPN : (isTotalShort || isShortRN || isShortPN);
+
                 return (
                   <td
                     key={date}
                     className={`coverage-cell text-center text-xs px-1 py-1 select-none transition ${
-                      isTotalOver
+                      isHighlightedOver
                         ? "bg-purple-50/90 border border-purple-200"
-                        : isTotalShort || isShortRN || isShortPN
+                        : isHighlightedShort
                         ? "bg-rose-50/90 border border-rose-200"
                         : "bg-white/80 hover:bg-slate-50"
                     }`}
@@ -337,32 +347,52 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
                   >
                     {loading ? "…" : (
                       <div className="flex flex-col items-center justify-center gap-0.5 leading-tight py-0.5">
-                        {/* RN breakdown */}
-                        <div className={`text-[10px] font-bold px-1 py-0.2 rounded w-full flex items-center justify-center gap-0.5 ${
-                          isOverRN ? "bg-purple-100 text-purple-900" : isShortRN ? "bg-rose-100 text-rose-800" : "text-blue-700 bg-blue-50/80"
-                        }`}>
-                          <span className="text-[8px] opacity-70">RN:</span>
-                          <span>{formatStaffCount(actualRN)}/{targetRN}</span>
-                        </div>
+                        {filterPosition === "rn" ? (
+                          <div className={`text-xs font-bold px-1.5 py-0.5 rounded w-full flex flex-col items-center justify-center ${
+                            isOverRN ? "bg-purple-100 text-purple-900 font-black" : isShortRN ? "bg-rose-100 text-rose-800 font-black" : "text-teal-800 bg-teal-50"
+                          }`}>
+                            <span className="text-[11px] font-extrabold">{formatStaffCount(actualRN)} / {targetRN}</span>
+                            {isOverRN && <span className="text-[8px] text-purple-800">+{(actualRN - targetRN).toFixed(1)}</span>}
+                            {isShortRN && <span className="text-[8px] text-rose-700 font-bold">ขาด {(targetRN - actualRN).toFixed(1)}</span>}
+                          </div>
+                        ) : filterPosition === "pn" ? (
+                          <div className={`text-xs font-bold px-1.5 py-0.5 rounded w-full flex flex-col items-center justify-center ${
+                            isOverPN ? "bg-purple-100 text-purple-900 font-black" : isShortPN ? "bg-rose-100 text-rose-800 font-black" : "text-emerald-800 bg-emerald-50"
+                          }`}>
+                            <span className="text-[11px] font-extrabold">{formatStaffCount(actualPN)} / {targetPN}</span>
+                            {isOverPN && <span className="text-[8px] text-purple-800">+{(actualPN - targetPN).toFixed(1)}</span>}
+                            {isShortPN && <span className="text-[8px] text-rose-700 font-bold">ขาด {(targetPN - actualPN).toFixed(1)}</span>}
+                          </div>
+                        ) : (
+                          <>
+                            {/* RN breakdown */}
+                            <div className={`text-[10px] font-bold px-1 py-0.2 rounded w-full flex items-center justify-center gap-0.5 ${
+                              isOverRN ? "bg-purple-100 text-purple-900" : isShortRN ? "bg-rose-100 text-rose-800" : "text-blue-700 bg-blue-50/80"
+                            }`}>
+                              <span className="text-[8px] opacity-70">RN:</span>
+                              <span>{formatStaffCount(actualRN)}/{targetRN}</span>
+                            </div>
 
-                        {/* PN breakdown */}
-                        <div className={`text-[10px] font-bold px-1 py-0.2 rounded w-full flex items-center justify-center gap-0.5 ${
-                          isOverPN ? "bg-purple-100 text-purple-900" : isShortPN ? "bg-rose-100 text-rose-800" : "text-amber-800 bg-amber-50/80"
-                        }`}>
-                          <span className="text-[8px] opacity-70">PN:</span>
-                          <span>{formatStaffCount(actualPN)}/{targetPN}</span>
-                        </div>
+                            {/* PN breakdown */}
+                            <div className={`text-[10px] font-bold px-1 py-0.2 rounded w-full flex items-center justify-center gap-0.5 ${
+                              isOverPN ? "bg-purple-100 text-purple-900" : isShortPN ? "bg-rose-100 text-rose-800" : "text-amber-800 bg-amber-50/80"
+                            }`}>
+                              <span className="text-[8px] opacity-70">PN:</span>
+                              <span>{formatStaffCount(actualPN)}/{targetPN}</span>
+                            </div>
 
-                        {/* Total indicator (small if exact, highlighted if over/short) */}
-                        {isTotalOver ? (
-                          <span className="text-[8px] bg-purple-200 text-purple-900 font-black px-1 rounded">
-                            รวม {formatStaffCount(actual)}/{target} (+{formatStaffCount(actual - target)})
-                          </span>
-                        ) : isTotalShort ? (
-                          <span className="text-[8px] bg-rose-200 text-rose-900 font-black px-1 rounded">
-                            รวม {formatStaffCount(actual)}/{target} (ขาด {formatStaffCount(target - actual)})
-                          </span>
-                        ) : null}
+                            {/* Total indicator */}
+                            {isTotalOver ? (
+                              <span className="text-[8px] bg-purple-200 text-purple-900 font-black px-1 rounded">
+                                รวม {formatStaffCount(actual)}/{target} (+{formatStaffCount(actual - target)})
+                              </span>
+                            ) : isTotalShort ? (
+                              <span className="text-[8px] bg-rose-200 text-rose-900 font-black px-1 rounded">
+                                รวม {formatStaffCount(actual)}/{target} (ขาด {formatStaffCount(target - actual)})
+                              </span>
+                            ) : null}
+                          </>
+                        )}
                       </div>
                     )}
                   </td>
@@ -372,6 +402,14 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
               <td className="coverage-cell bg-slate-200/80 text-center font-bold text-xs text-slate-800 px-2 py-2">
                 {loading ? (
                   "…"
+                ) : filterPosition === "rn" ? (
+                  <div className="flex flex-col items-center justify-center gap-0.5 text-xs">
+                    <span className="text-teal-900 font-black text-[11px]">RN รวม {formatStaffCount(totalRnPeriod)}</span>
+                  </div>
+                ) : filterPosition === "pn" ? (
+                  <div className="flex flex-col items-center justify-center gap-0.5 text-xs">
+                    <span className="text-emerald-900 font-black text-[11px]">PN รวม {formatStaffCount(totalPnPeriod)}</span>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center gap-0.5 text-[10px]">
                     <span className="text-blue-800 font-bold">RN: {formatStaffCount(totalRnPeriod)}</span>

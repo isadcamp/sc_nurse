@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { ModalFrame } from "@/components/ui/ModalFrame";
 import { PrinterIcon } from "@heroicons/react/24/outline";
 import { Roster } from "@/types/schedule";
@@ -17,6 +17,8 @@ export function OfficialRosterPrint({
   roster,
   wardName,
 }: OfficialRosterPrintProps) {
+  const [printFilter, setPrintFilter] = useState<"all" | "rn" | "pn">("all");
+
   if (!open) return null;
 
   const year = roster.year;
@@ -56,6 +58,9 @@ export function OfficialRosterPrint({
     if (idCmp !== 0) return idCmp;
     return (a.name || "").localeCompare(b.name || "", "th");
   });
+
+  const rnStaff = sortedStaff.filter(s => (s.position || "").toUpperCase() === "RN");
+  const pnStaff = sortedStaff.filter(s => (s.position || "").toUpperCase() === "PN");
 
   // Count totals per nurse
   const nurseStats = sortedStaff.map((staff) => {
@@ -129,11 +134,18 @@ export function OfficialRosterPrint({
     };
   });
 
+  const displayedStats =
+    printFilter === "rn"
+      ? nurseStats.filter((item) => (item.staff.position || "").toUpperCase() === "RN")
+      : printFilter === "pn"
+      ? nurseStats.filter((item) => (item.staff.position || "").toUpperCase() === "PN")
+      : nurseStats;
+
   return (
     <ModalFrame title="ตัวอย่างพิมพ์ตารางเวร A4" onClose={onClose} className="nf-print-modal">
       <div className="bg-white rounded-2xl shadow-2xl max-w-[98vw] w-full p-6 overflow-x-auto print:max-w-none print:shadow-none print:p-2 print:border-none">
         {/* Controls - Hidden in print */}
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200 print:hidden">
+        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200 print:hidden flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <PrinterIcon className="h-6 w-6 text-blue-600"/>
             <div>
@@ -141,7 +153,30 @@ export function OfficialRosterPrint({
               <p className="text-xs text-slate-500">พร้อมฟอร์มขนาด A4 แนวนอน และช่องลงนามอนุมัติ</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setPrintFilter("all")}
+                className={`px-2.5 py-1 rounded-lg transition ${printFilter === "all" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                ทั้งหมด ({nurseStats.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFilter("rn")}
+                className={`px-2.5 py-1 rounded-lg transition ${printFilter === "rn" ? "bg-teal-600 text-white shadow-xs" : "text-teal-800 hover:bg-teal-50"}`}
+              >
+                เฉพาะ RN ({rnStaff.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFilter("pn")}
+                className={`px-2.5 py-1 rounded-lg transition ${printFilter === "pn" ? "bg-emerald-600 text-white shadow-xs" : "text-emerald-800 hover:bg-emerald-50"}`}
+              >
+                เฉพาะ PN ({pnStaff.length})
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => window.print()}
@@ -163,7 +198,9 @@ export function OfficialRosterPrint({
         <div className="print-page font-sans text-slate-900 min-w-[1000px]">
           {/* Header */}
           <div className="text-center mb-4">
-            <h2 className="text-lg font-bold tracking-tight">ตารางการปฏิบัติงานของบุคลากรทางการพยาบาล</h2>
+            <h2 className="text-lg font-bold tracking-tight">
+              ตารางการปฏิบัติงานของบุคลากรทางการพยาบาล {printFilter === "rn" ? "(เฉพาะพยาบาลวิชาชีพ - RN)" : printFilter === "pn" ? "(เฉพาะผู้ช่วยพยาบาล - PN)" : ""}
+            </h2>
             <div className="text-xs font-semibold text-slate-700 flex justify-center gap-6 mt-1">
               <span><strong>หน่วยงาน:</strong> {wardName} ({roster.wardId})</span>
               <span><strong>ประจำเดือน:</strong> {thaiMonth} พ.ศ. {thaiYear} ({year})</span>
@@ -203,7 +240,7 @@ export function OfficialRosterPrint({
               </tr>
             </thead>
             <tbody>
-              {nurseStats.map((item, idx) => (
+              {displayedStats.map((item, idx) => (
                 <tr key={item.staff.id} className="border-b border-slate-800 hover:bg-slate-50">
                   <td className="border border-slate-800 p-1 text-center font-medium">{idx + 1}</td>
                   <td className="border border-slate-800 p-1 text-left font-semibold truncate max-w-[140px]">

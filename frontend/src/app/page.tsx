@@ -101,6 +101,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState("");
   const [focusedCell, setFocusedCell] = useState<string | null>(null);
+  const [staffViewFilter, setStaffViewFilter] = useState<"all" | "rn" | "pn">("all");
 
   const [year, mon] = month.split("-").map(Number);
   const daysInMonth = Number.isFinite(year) && mon >= 1 && mon <= 12 ? new Date(Date.UTC(year, mon, 0)).getUTCDate() : 0;
@@ -668,6 +669,10 @@ const holidaySet = new Set<string>();
   const rnCount = useMemo(() => sortedStaff.filter((s) => (s.position || "").toUpperCase() === "RN").length, [sortedStaff]);
   const pnCount = useMemo(() => sortedStaff.filter((s) => (s.position || "").toUpperCase() === "PN").length, [sortedStaff]);
 
+  const rnStaff = useMemo(() => sortedStaff.filter((s) => (s.position || "").toUpperCase() === "RN"), [sortedStaff]);
+  const pnStaff = useMemo(() => sortedStaff.filter((s) => (s.position || "").toUpperCase() === "PN"), [sortedStaff]);
+  const otherStaff = useMemo(() => sortedStaff.filter((s) => !["RN", "PN"].includes((s.position || "").toUpperCase())), [sortedStaff]);
+
   return (
         <div className="min-h-screen bg-slate-50 font-sans">
       {!token ? (
@@ -896,6 +901,65 @@ const holidaySet = new Set<string>();
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Hybrid View Tab Filter Bar */}
+                  <div className="flex items-center justify-between flex-wrap gap-2 px-1">
+                    <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 border border-slate-200 rounded-2xl shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setStaffViewFilter("all")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                          staffViewFilter === "all"
+                            ? "bg-white text-slate-900 shadow-xs border border-slate-300"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        <span>👥 ทั้งหมด</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${staffViewFilter === "all" ? "bg-slate-800 text-white" : "bg-slate-200 text-slate-700"}`}>
+                          {sortedStaff.length}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStaffViewFilter("rn")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                          staffViewFilter === "rn"
+                            ? "bg-teal-600 text-white shadow-xs"
+                            : "text-teal-800 hover:bg-teal-50"
+                        }`}
+                      >
+                        <span>🩺 พยาบาลวิชาชีพ (RN)</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${staffViewFilter === "rn" ? "bg-teal-800 text-white" : "bg-teal-100 text-teal-800"}`}>
+                          {rnCount}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStaffViewFilter("pn")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                          staffViewFilter === "pn"
+                            ? "bg-emerald-600 text-white shadow-xs"
+                            : "text-emerald-800 hover:bg-emerald-50"
+                        }`}
+                      >
+                        <span>🧤 ผู้ช่วยพยาบาล (PN)</span>
+                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${staffViewFilter === "pn" ? "bg-emerald-800 text-white" : "bg-emerald-100 text-emerald-800"}`}>
+                          {pnCount}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="text-xs text-slate-500 flex items-center gap-2">
+                      <span>มุมมองปัจจุบัน:</span>
+                      <span className="font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                        {staffViewFilter === "all"
+                          ? `แยกกลุ่ม RN (${rnCount}) & PN (${pnCount}) ทั้งหมด`
+                          : staffViewFilter === "rn"
+                          ? `เฉพาะพยาบาลวิชาชีพ RN (${rnCount} คน)`
+                          : `เฉพาะผู้ช่วยพยาบาล PN (${pnCount} คน)`}
+                      </span>
+                    </div>
+                  </div>
+
                   <div className="matrix-container" tabIndex={0} role="region" aria-label="ตารางเวร เลื่อนเพื่อดูทุกวันที่">
                     <table className="matrix-table">
                       <caption className="sr-only">ตารางเวร {month}</caption>
@@ -906,7 +970,13 @@ const holidaySet = new Set<string>();
                               <span className="text-[11px] font-bold text-slate-400 w-5 text-center">#</span>
                               <div>
                                 <div className="text-xs font-bold text-slate-800">รายชื่อเจ้าหน้าที่</div>
-                                <div className="text-[10px] text-slate-400 font-normal">ทั้งหมด {sortedStaff.length} คน (RN: {rnCount}, PN: {pnCount})</div>
+                                <div className="text-[10px] text-slate-400 font-normal">
+                                  {staffViewFilter === "all"
+                                    ? `ทั้งหมด ${sortedStaff.length} คน (RN: ${rnCount}, PN: ${pnCount})`
+                                    : staffViewFilter === "rn"
+                                    ? `พยาบาลวิชาชีพ ${rnCount} คน`
+                                    : `ผู้ช่วยพยาบาล ${pnCount} คน`}
+                                </div>
                               </div>
                             </div>
                           </th>
@@ -945,82 +1015,144 @@ const holidaySet = new Set<string>();
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedStaff.map((nurse, idx) => (
-                          <tr key={nurse.id} className="border-b border-slate-200 hover:bg-slate-50/70 transition">
-                            {/* Sticky Nurse Info (ลำดับ, ตำแหน่ง, ชื่อ-สกุล, หมายเลขพนักงาน) */}
-                            <td className="sticky-nurse-col p-2 text-left">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-bold text-slate-400 w-5 text-center shrink-0">
-                                  {idx + 1}
-                                </span>
-                                <span
-                                  className={`px-1.5 py-0.5 text-[10px] font-bold rounded shrink-0 ${
-                                    nurse.position === "RN" ? "bg-teal-100 text-teal-800 border border-teal-200" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                                  }`}
-                                >
-                                  {nurse.position}
-                                </span>
-                                {nurse.partTime && (
-                                  <span
-                                    className="px-1.5 py-0.5 text-[10px] font-extrabold rounded shrink-0 bg-purple-100 text-purple-850 border border-purple-200"
-                                    title="พยาบาลพาร์ทไทม์ / เวรเสริม"
-                                  >
-                                    PT
-                                  </span>
-                                )}
-                                <div className="flex flex-col min-w-0 leading-tight">
-                                  <div className="truncate font-bold text-slate-800 text-xs max-w-[155px]" title={nurse.name}>
-                                    {nurse.name}
-                                  </div>
-                                  <span className="text-[10px] text-slate-400 font-mono font-medium">
-                                    รหัส: {nurse.id}
+                        {/* Render Staff Rows with Section Dividers */}
+                        {(() => {
+                          const displayedStaff =
+                            staffViewFilter === "rn"
+                              ? rnStaff
+                              : staffViewFilter === "pn"
+                              ? pnStaff
+                              : sortedStaff;
+
+                          const renderSectionHeader = (title: string, badge: string, count: number, bgClass: string, textClass: string, borderClass: string) => (
+                            <tr key={`section-${title}`} className={`border-y-2 ${borderClass} ${bgClass} font-extrabold text-xs`}>
+                              <td className="sticky-nurse-col p-2 text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm">{badge}</span>
+                                  <span className={`font-black ${textClass}`}>{title}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black bg-white shadow-2xs border ${borderClass} ${textClass}`}>
+                                    {count} คน
                                   </span>
                                 </div>
-                              </div>
-                            </td>
+                              </td>
+                              <td colSpan={dates.length + 1} className={`p-2 text-left text-[11px] font-semibold ${textClass} opacity-85`}>
+                                กลุ่ม{title} ประจำการ {count} คน (หมุนเวร 24 ชม.)
+                              </td>
+                            </tr>
+                          );
 
-                            {/* Matrix Cells */}
-                            {dates.map((d) => {
-                              const cell = cellMap.get(`${nurse.id}_${d}`) ?? { id: 0, nurseId: nurse.id, date: d, shiftCode: "", version: 0, locked: false };
-                              const violation = cellViolationMap.get(`${nurse.id}_${d}`);
-                              const shiftCode = cell?.shiftCode || "";
-                              const isLocked = cell?.locked || false;
+                          const renderRow = (nurse: typeof sortedStaff[0], displayIdx: number) => (
+                            <tr key={nurse.id} className="border-b border-slate-200 hover:bg-slate-50/70 transition">
+                              {/* Sticky Nurse Info */}
+                              <td className="sticky-nurse-col p-2 text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-slate-400 w-5 text-center shrink-0">
+                                    {displayIdx}
+                                  </span>
+                                  <span
+                                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded shrink-0 ${
+                                      nurse.position === "RN" ? "bg-teal-100 text-teal-800 border border-teal-200" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    }`}
+                                  >
+                                    {nurse.position}
+                                  </span>
+                                  {nurse.partTime && (
+                                    <span
+                                      className="px-1.5 py-0.5 text-[10px] font-extrabold rounded shrink-0 bg-purple-100 text-purple-850 border border-purple-200"
+                                      title="พยาบาลพาร์ทไทม์ / เวรเสริม"
+                                    >
+                                      PT
+                                    </span>
+                                  )}
+                                  <div className="flex flex-col min-w-0 leading-tight">
+                                    <div className="truncate font-bold text-slate-800 text-xs max-w-[155px]" title={nurse.name}>
+                                      {nurse.name}
+                                    </div>
+                                    <span className="text-[10px] text-slate-400 font-mono font-medium">
+                                      รหัส: {nurse.id}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
 
-                              return (
-                                <td
-                                  key={d}
-                                  className={`p-1 text-center border-r border-slate-100 ${holidaySet.has(d) || [0,6].includes(new Date(d).getDay()) ? "bg-blue-50/40" : ""}`}
-                                >
-                                  <button type="button" className={`nf-cell-button ${focusedCell === `${nurse.id}_${d}` ? "is-highlighted" : ""}`} data-cell-key={`${nurse.id}_${d}`} aria-label={`${nurse.name} ${d} ${shiftCode || "ว่าง"}${isLocked ? " ล็อก" : ""}`} aria-disabled={!canEdit || busy || saving} onClick={e => cell && handleCellClick(cell,e)}>
-                                  <ShiftBadge
-                                    shiftCode={shiftCode}
-                                    locked={isLocked}
-                                    isError={violation?.severity === "error"}
-                                    isWarning={violation?.severity === "warning"}
-                                    size="md"
-                                  />
-                                  </button>
-                                </td>
-                              );
-                            })}
+                              {/* Matrix Cells */}
+                              {dates.map((d) => {
+                                const cell = cellMap.get(`${nurse.id}_${d}`) ?? { id: 0, nurseId: nurse.id, date: d, shiftCode: "", version: 0, locked: false };
+                                const violation = cellViolationMap.get(`${nurse.id}_${d}`);
+                                const shiftCode = cell?.shiftCode || "";
+                                const isLocked = cell?.locked || false;
 
-                            {/* Nurse Stats Summary Column */}
-                            <NurseStatsColumn
-                              nurseId={nurse.id}
-                              position={nurse.position}
-                              assignments={roster.assignments}
-                              targetHours={(roster.policy?.targets as Array<{ nurseId: string; hours: number }> | undefined)?.find((target) => target.nurseId === nurse.id)?.hours ?? 0}
-                              compensation={roster.policy?.compensation}
-                              onDrilldown={() => {
-                                setDrilldownNurse(nurse);
-                                setShowDrilldownModal(true);
-                              }}
-                            />
-                          </tr>
-                        ))}
+                                return (
+                                  <td
+                                    key={d}
+                                    className={`p-1 text-center border-r border-slate-100 ${holidaySet.has(d) || [0,6].includes(new Date(d).getDay()) ? "bg-blue-50/40" : ""}`}
+                                  >
+                                    <button type="button" className={`nf-cell-button ${focusedCell === `${nurse.id}_${d}` ? "is-highlighted" : ""}`} data-cell-key={`${nurse.id}_${d}`} aria-label={`${nurse.name} ${d} ${shiftCode || "ว่าง"}${isLocked ? " ล็อก" : ""}`} aria-disabled={!canEdit || busy || saving} onClick={e => cell && handleCellClick(cell,e)}>
+                                    <ShiftBadge
+                                      shiftCode={shiftCode}
+                                      locked={isLocked}
+                                      isError={violation?.severity === "error"}
+                                      isWarning={violation?.severity === "warning"}
+                                      size="md"
+                                    />
+                                    </button>
+                                  </td>
+                                );
+                              })}
+
+                              {/* Nurse Stats Summary Column */}
+                              <NurseStatsColumn
+                                nurseId={nurse.id}
+                                position={nurse.position}
+                                assignments={roster.assignments}
+                                targetHours={(roster.policy?.targets as Array<{ nurseId: string; hours: number }> | undefined)?.find((target) => target.nurseId === nurse.id)?.hours ?? 0}
+                                compensation={roster.policy?.compensation}
+                                onDrilldown={() => {
+                                  setDrilldownNurse(nurse);
+                                  setShowDrilldownModal(true);
+                                }}
+                              />
+                            </tr>
+                          );
+
+                          if (staffViewFilter === "all") {
+                            return (
+                              <>
+                                {rnStaff.length > 0 && renderSectionHeader("พยาบาลวิชาชีพ (Registered Nurse - RN)", "🩺", rnStaff.length, "bg-teal-50/80", "text-teal-900", "border-teal-300")}
+                                {rnStaff.map((nurse, idx) => renderRow(nurse, idx + 1))}
+
+                                {pnStaff.length > 0 && renderSectionHeader("ผู้ช่วยพยาบาล (Practical Nurse - PN)", "🧤", pnStaff.length, "bg-emerald-50/80", "text-emerald-900", "border-emerald-300")}
+                                {pnStaff.map((nurse, idx) => renderRow(nurse, rnStaff.length + idx + 1))}
+
+                                {otherStaff.length > 0 && renderSectionHeader("บุคลากรอื่นๆ (Other Staff)", "👤", otherStaff.length, "bg-slate-100", "text-slate-800", "border-slate-300")}
+                                {otherStaff.map((nurse, idx) => renderRow(nurse, rnStaff.length + pnStaff.length + idx + 1))}
+                              </>
+                            );
+                          }
+
+                          if (staffViewFilter === "rn") {
+                            return (
+                              <>
+                                {renderSectionHeader("พยาบาลวิชาชีพ (Registered Nurse - RN)", "🩺", rnStaff.length, "bg-teal-50/80", "text-teal-900", "border-teal-300")}
+                                {rnStaff.map((nurse, idx) => renderRow(nurse, idx + 1))}
+                              </>
+                            );
+                          }
+
+                          if (staffViewFilter === "pn") {
+                            return (
+                              <>
+                                {renderSectionHeader("ผู้ช่วยพยาบาล (Practical Nurse - PN)", "🧤", pnStaff.length, "bg-emerald-50/80", "text-emerald-900", "border-emerald-300")}
+                                {pnStaff.map((nurse, idx) => renderRow(nurse, idx + 1))}
+                              </>
+                            );
+                          }
+
+                          return displayedStaff.map((nurse, idx) => renderRow(nurse, idx + 1));
+                        })()}
 
                         {/* Daily Coverage Summary Row */}
-                        <CoverageSummaryRow dates={dates} rosterId={roster.id} token={token} roster={roster} />
+                        <CoverageSummaryRow dates={dates} rosterId={roster.id} token={token} roster={roster} filterPosition={staffViewFilter} />
                       </tbody>
                     </table>
                   </div>
