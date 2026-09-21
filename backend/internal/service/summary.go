@@ -154,6 +154,8 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 					calculatedEveNightShifts += 1.0
 				} else if code == "บด" {
 					calculatedEveNightShifts += 2.0
+				} else if code == "ชด" {
+					calculatedEveNightShifts += 1.0
 				}
 			}
 		}

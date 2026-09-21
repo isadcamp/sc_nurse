@@ -286,6 +286,34 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 	for td := a; td.Before(b); td = td.AddDate(0, 0, 1) {
 		numDays++
 	}
+
+	nurseLeavesCount := map[string]int{}
+	for _, c := range fixed {
+		if c.ShiftCode == "L" || c.ShiftCode == "Va" || c.ShiftCode == "V" || c.ShiftCode == "v" {
+			nurseLeavesCount[c.NurseID]++
+		}
+	}
+	for nid, lmap := range leavesMap {
+		if len(lmap) > nurseLeavesCount[nid] {
+			nurseLeavesCount[nid] = len(lmap)
+		}
+	}
+
+	workingDaysBase := r.Policy.Compensation.WorkingDays
+	if workingDaysBase <= 0 {
+		wCount := 0
+		for td := a; td.Before(b); td = td.AddDate(0, 0, 1) {
+			if td.Weekday() != time.Saturday && td.Weekday() != time.Sunday {
+				wCount++
+			}
+		}
+		workingDaysBase = wCount
+		if workingDaysBase <= 0 {
+			workingDaysBase = 22
+		}
+	}
+	baselineTargetHours := float64(workingDaysBase * 8)
+
 	rnCount := 0
 	pnCount := 0
 	for _, n := range staff {
@@ -957,25 +985,29 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 							}
 						}
 
-						// Standard monthly target hours leveling (เกลี่ยชั่วโมงทำงานให้ได้มาตรฐานและเท่าเทียมกัน)
-						tTarget := float64(numDays-8) * 8.0
+						// Standard monthly target hours leveling (เกลี่ยชั่วโมงทำงานให้ครบเกณฑ์วันทำการ เช่น 22 วัน = 176 ชม.)
+						tTarget := baselineTargetHours
 						if t, ok := targetsMap[n.ID]; ok && t.Hours > 0 {
 							tTarget = t.Hours
-						} else if r.Policy.MaxMonthlyHours > 0 {
+						} else if r.Policy.MaxMonthlyHours > 0 && r.Policy.MaxMonthlyHours < tTarget {
 							tTarget = r.Policy.MaxMonthlyHours
 						}
-						hourDeficit := tTarget - monthlyHours[n.ID]
+
+						leaveCredit := float64(nurseLeavesCount[n.ID]) * 8.0
+						effectiveCredit := monthlyHours[n.ID] + leaveCredit
+						hourDeficit := tTarget - effectiveCredit
+
 						if hourDeficit > 0 {
-							score += hourDeficit * 15.0
+							score += hourDeficit * 35.0
 						} else {
-							score += hourDeficit * 6.0
+							score += hourDeficit * 8.0
 						}
 
 						// Uniform Monthly Pacing: Prevent accumulating hours too fast in early weeks (avoid burnout and end-of-month idle clusters)
 						if numDays > 0 {
 							expectedPacingHours := float64(dayIndex+1) * (tTarget / float64(numDays))
-							if monthlyHours[n.ID] > expectedPacingHours+16.0 {
-								score -= (monthlyHours[n.ID] - expectedPacingHours) * 20.0
+							if effectiveCredit > expectedPacingHours+16.0 {
+								score -= (effectiveCredit - expectedPacingHours) * 20.0
 							}
 						}
 
@@ -1580,6 +1612,7 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		}
 	}
 
+	scheduledCells = guaranteeMinWorkingDays(r, scheduledCells)
 	scheduledCells = pruneExcessDoubles(r, scheduledCells)
 
 	testRoster := r
@@ -1776,6 +1809,206 @@ func CalculatePlanMetrics(r domain.Roster, assignments []domain.Cell) domain.Pla
 		MaxHours:         maxH,
 		MinHours:         minH,
 	}
+}
+
+// guaranteeMinWorkingDays checks if any active, non-part-time staff member is below their required working days / target hours
+// (e.g. 22 shifts / 176 hours, accounting for approved leave credits).
+// If so, it scans for safe OFF days where assigning a standard Morning ("ช") or allowable shift does not violate
+// rest hours, consecutive constraints, or approved leaves.
+func guaranteeMinWorkingDays(r domain.Roster, cells []domain.Cell) []domain.Cell {
+	if len(cells) == 0 {
+		return cells
+	}
+	a, b := monthRange(r)
+	daysInMonth := int(b.Sub(a).Hours() / 24)
+	if daysInMonth < 20 {
+		return cells
+	}
+
+	out := append([]domain.Cell(nil), cells...)
+
+	workingDaysBase := r.Policy.Compensation.WorkingDays
+	if workingDaysBase <= 0 {
+		wCount := 0
+		for td := a; td.Before(b); td = td.AddDate(0, 0, 1) {
+			if td.Weekday() != time.Saturday && td.Weekday() != time.Sunday {
+				wCount++
+			}
+		}
+		workingDaysBase = wCount
+		if workingDaysBase <= 0 {
+			workingDaysBase = 22
+		}
+	}
+	baselineTargetHours := float64(workingDaysBase * 8)
+
+	targetsMap := map[string]domain.Target{}
+	for _, t := range r.Policy.Targets {
+		targetsMap[t.NurseID] = t
+	}
+
+	shiftHoursMap := make(map[string]float64, len(r.Shifts))
+	for _, s := range r.Shifts {
+		totMins := 0
+		for _, p := range s.Periods {
+			totMins += (p.End - p.Start)
+		}
+		shiftHoursMap[s.Code] = float64(totMins) / 60.0
+	}
+
+	cellMap := make(map[string]int, len(out))
+	nurseAssignments := make(map[string][]domain.Cell)
+	for i, c := range out {
+		cellMap[c.NurseID+"@"+c.Date] = i
+		nurseAssignments[c.NurseID] = append(nurseAssignments[c.NurseID], c)
+	}
+
+	getShift := func(nurseID, dateStr string) string {
+		if idx, ok := cellMap[nurseID+"@"+dateStr]; ok {
+			return out[idx].ShiftCode
+		}
+		for _, bc := range r.Boundary {
+			if bc.NurseID == nurseID && bc.Date == dateStr {
+				return bc.ShiftCode
+			}
+		}
+		return ""
+	}
+
+	maxConsecutiveDays := r.Policy.MaxConsecutiveDays
+	if maxConsecutiveDays <= 0 {
+		maxConsecutiveDays = 6
+	}
+
+	for _, n := range r.Staff {
+		if !n.Active || n.PartTime {
+			continue
+		}
+
+		tTarget := baselineTargetHours
+		if t, ok := targetsMap[n.ID]; ok && t.Hours > 0 {
+			tTarget = t.Hours
+		}
+
+		// Calculate current total credit hours and off days
+		currentHours := 0.0
+		leaveDays := 0
+		offDays := 0
+		for _, c := range nurseAssignments[n.ID] {
+			code := out[cellMap[n.ID+"@"+c.Date]].ShiftCode
+			if code == "L" || code == "Va" || code == "V" || code == "v" {
+				leaveDays++
+			} else if code == "X" || code == "x" || code == "อ" || code == "" {
+				offDays++
+			} else if h, ok := shiftHoursMap[code]; ok && h > 0 {
+				currentHours += h
+			}
+		}
+		totalCredit := currentHours + float64(leaveDays*8)
+
+		if totalCredit >= tTarget {
+			continue
+		}
+
+		minOff := r.Policy.MinOff
+		if minOff <= 0 {
+			minOff = 4
+		}
+
+		neededHours := tTarget - totalCredit
+		neededShifts := int(math.Ceil(neededHours / 8.0))
+
+		// Try assigning Morning shift "ช" (or standard shift) on safe OFF ("X") days
+		for _, c := range nurseAssignments[n.ID] {
+			if neededShifts <= 0 || offDays <= minOff {
+				break
+			}
+			idx := cellMap[n.ID+"@"+c.Date]
+			currentCode := out[idx].ShiftCode
+			if currentCode != "X" && currentCode != "" {
+				continue
+			}
+			if out[idx].Locked {
+				continue
+			}
+			if r.Policy.MaxMonthlyHours > 0 && currentHours+8.0 > r.Policy.MaxMonthlyHours {
+				break
+			}
+
+			// Do not overstaff a day that is already fully covered
+			dailyAssignedCount := 0
+			for _, m := range r.Staff {
+				mcode := getShift(m.ID, c.Date)
+				if mcode != "" && mcode != "X" && mcode != "x" && mcode != "L" && mcode != "Va" && mcode != "V" && mcode != "v" {
+					dailyAssignedCount++
+				}
+			}
+			dailyDemand := 0
+			for _, st := range staffingForDate(r, c.Date) {
+				dailyDemand += st.RN + st.Leaders + st.PN
+			}
+			if dailyDemand > 0 && dailyAssignedCount >= dailyDemand {
+				continue
+			}
+
+			// Check shift permissions
+			allowedMorning := false
+			for _, allowedCode := range n.Allowed {
+				if allowedCode == "ช" {
+					allowedMorning = true
+					break
+				}
+			}
+			if !allowedMorning {
+				continue
+			}
+
+			curDate, err := time.Parse("2006-01-02", c.Date)
+			if err != nil {
+				continue
+			}
+			prevDateStr := curDate.AddDate(0, 0, -1).Format("2006-01-02")
+			prevCode := getShift(n.ID, prevDateStr)
+
+			// Rest hours validation: Night before Morning is illegal
+			if prevCode == "ด" || prevCode == "N" || prevCode == "Night" || prevCode == "12N" || prevCode == "บด" || prevCode == "ชด" {
+				continue
+			}
+
+			// Consecutive days check
+			consec := 1
+			for b := 1; b <= maxConsecutiveDays; b++ {
+				bd := curDate.AddDate(0, 0, -b).Format("2006-01-02")
+				bcode := getShift(n.ID, bd)
+				if bcode != "" && bcode != "X" && bcode != "L" && bcode != "Va" && bcode != "V" && bcode != "v" {
+					consec++
+				} else {
+					break
+				}
+			}
+			for f := 1; f <= maxConsecutiveDays; f++ {
+				fd := curDate.AddDate(0, 0, f).Format("2006-01-02")
+				fcode := getShift(n.ID, fd)
+				if fcode != "" && fcode != "X" && fcode != "L" && fcode != "Va" && fcode != "V" && fcode != "v" {
+					consec++
+				} else {
+					break
+				}
+			}
+
+			if consec > maxConsecutiveDays {
+				continue
+			}
+
+			// Assign Morning shift
+			out[idx].ShiftCode = "ช"
+			currentHours += 8.0
+			offDays--
+			neededShifts--
+		}
+	}
+
+	return out
 }
 
 // pruneExcessDoubles scans all dates in the roster and downgrades any unlocked "ชบ" to "ช"
