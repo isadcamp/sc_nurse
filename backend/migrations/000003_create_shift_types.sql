@@ -1,0 +1,17 @@
+-- 000003_create_shift_types.sql
+CREATE TABLE IF NOT EXISTS shift_types (
+    id VARCHAR(36) PRIMARY KEY,
+    ward_id VARCHAR(36) NOT NULL,
+    code VARCHAR(8) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    is_double BOOLEAN NOT NULL DEFAULT FALSE,
+    is_off BOOLEAN NOT NULL DEFAULT FALSE,
+    total_hours FLOAT NOT NULL,
+    is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(64),
+    updated_by VARCHAR(64),
+    CONSTRAINT fk_shift_type_ward FOREIGN KEY (ward_id) REFERENCES wards(id) ON DELETE CASCADE
+) ENGINE=InnoDB;

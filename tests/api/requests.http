@@ -1,0 +1,19 @@
+@baseUrl = http://localhost:8080
+
+### Health
+GET {{baseUrl}}/health
+
+### Nurses (demo data)
+GET {{baseUrl}}/api/v1/nurses
+
+### Generate draft
+POST {{baseUrl}}/api/v1/schedules/generate
+Content-Type: application/json
+
+{"startDate":"2026-09-14","days":7,"requiredPerShift":2}
+
+### Invalid date must return 422
+POST {{baseUrl}}/api/v1/schedules/generate
+Content-Type: application/json
+
+{"startDate":"invalid","days":7,"requiredPerShift":2}

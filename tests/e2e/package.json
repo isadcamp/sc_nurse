@@ -1,0 +1,12 @@
+{
+  "name": "nurse-scheduler-e2e",
+  "private": true,
+  "scripts": {
+    "install:browsers": "set PLAYWRIGHT_BROWSERS_PATH=./browsers&& playwright install chromium",
+    "test": "set PLAYWRIGHT_BROWSERS_PATH=./browsers&& playwright test",
+    "test:ui": "set PLAYWRIGHT_BROWSERS_PATH=./browsers&& playwright test --ui"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

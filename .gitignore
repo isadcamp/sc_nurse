@@ -1,0 +1,13 @@
+node_modules/
+.next/
+playwright-report/
+test-results/
+tests/e2e/browsers/
+.npm-cache/
+.npm-cache*/
+.go-cache/
+*.tsbuildinfo
+.env
+*.exe
+coverage.out
+.sites-runtime/

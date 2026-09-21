@@ -1,0 +1,1 @@
+ALTER TABLE shift_types ADD COLUMN periods JSON NULL;
