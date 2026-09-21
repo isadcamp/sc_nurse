@@ -230,7 +230,7 @@ export default function Home() {
     setNotice("");
     setData(null);
     setVersions([]);
-   
+
     try {
       const list = await request<{ data: ScheduleSummary[] }>(`/wards/${encodeURIComponent(ward)}/schedules?month=${mon}&year=${year}`, token);
       if (!list.data.length) {
@@ -1387,11 +1387,11 @@ const holidaySet = new Set<string>();
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold text-slate-900">จัดตารางเวรอัตโนมัติด้วย AI Solver</h2>
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-100 text-blue-800">Sprint 5/6 AUTO</span>
+                      <h2 className="text-base font-bold text-slate-900">สร้างแผนตารางเวร</h2>
+
                     </div>
                     <p className="text-xs text-slate-500">
-                      ระบบค้นหาและจัดสรรตารางเวรคนประจำเต็มศักยภาพ ไม่สร้างบุคลากรเสมือน พร้อมสรุปเวรขาดเพื่อการตัดสินใจ
+                      ตรวจความพร้อม → จัดเวร → ตรวจผลและบันทึก
                     </p>
                   </div>
                 </div>
@@ -1405,6 +1405,8 @@ const holidaySet = new Set<string>();
               </div>
 
               <SolverPanel
+                key={roster.id}
+                wardName={currentWardName}
                 roster={roster}
                 token={token}
                 onRosterUpdated={(res) => {
@@ -1423,7 +1425,7 @@ const holidaySet = new Set<string>();
                 }}
                 onApplied={(res) => {
                   setData(res);
-                  setNotice("🎉 นำผลการจัดเวร AUTO ไปบันทึกลงตารางเวรจริงเรียบร้อยแล้ว");
+                  setNotice("บันทึกผลจัดเวรแล้ว กรุณาตรวจตารางก่อนส่งอนุมัติและประกาศใช้");
                   openWorkspace("schedule");
                 }}
                 onBackToGrid={() => openWorkspace("schedule")}
