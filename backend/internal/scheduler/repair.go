@@ -86,7 +86,9 @@ func (ConstraintSolver) Solve(ctx context.Context, in domain.SolverInput) (domai
 				if focus == "" { break }
 				fd, _ := time.Parse("2006-01-02", focus)
 				windowRadius := seedAttempts
-				if attempts > 3 { windowRadius = 31 } // ขยายทั้งเดือนเมื่อ attempts > 3
+				if windowRadius > 4 {
+					windowRadius = 4
+				}
 				low, high := fd.AddDate(0,0,-windowRadius).Format("2006-01-02"), fd.AddDate(0,0,windowRadius).Format("2006-01-02")
 				for i,c := range rebuilt {
 					if c.Date >= low && c.Date <= high && search.mutable(c) { rebuilt[i].ShiftCode = "X" }

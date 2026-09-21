@@ -17,8 +17,8 @@ func baseRoster(numRN, numPN int) domain.Roster {
 	r.Staff = []domain.Staff{}
 	for i := 1; i <= numRN; i++ {
 		r.Staff = append(r.Staff, domain.Staff{
-			ID:       "rn-" + string(rune('0'+i)),
-			Name:     "พยาบาล RN " + string(rune('0'+i)),
+			ID:       fmt.Sprintf("rn-%d", i),
+			Name:     fmt.Sprintf("พยาบาล RN %d", i),
 			Position: "RN",
 			Active:   true,
 			Leader:   i <= 2, // first 2 are leaders
@@ -29,8 +29,8 @@ func baseRoster(numRN, numPN int) domain.Roster {
 	}
 	for i := 1; i <= numPN; i++ {
 		r.Staff = append(r.Staff, domain.Staff{
-			ID:       "pn-" + string(rune('0'+i)),
-			Name:     "ผู้ช่วย PN " + string(rune('0'+i)),
+			ID:       fmt.Sprintf("pn-%d", i),
+			Name:     fmt.Sprintf("ผู้ช่วย PN %d", i),
 			Position: "PN",
 			Active:   true,
 			Double:   true,

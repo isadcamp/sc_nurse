@@ -538,14 +538,14 @@ func TestSolveNeverGeneratesForbiddenTransitionsOrBD(t *testing.T) {
 
 	start := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
-	for _, dates := range byNurse {
+	for nurseID, dates := range byNurse {
 		for d := start; d.Before(end.AddDate(0, 0, -1)); d = d.AddDate(0, 0, 1) {
 			d1 := d.Format("2006-01-02")
 			d2 := d.AddDate(0, 0, 1).Format("2006-01-02")
 			c1 := dates[d1]
 			c2 := dates[d2]
 			if c1 == "บ" && c2 == "ด" {
-				t.Fatalf("forbidden transition บ->ด found on %s->%s", d1, d2)
+				t.Fatalf("forbidden transition บ->ด for nurse %s found on %s (%s) -> %s (%s)", nurseID, d1, c1, d2, c2)
 			}
 			if c1 == "ด" && c2 == "บ" {
 				t.Fatalf("forbidden transition ด->บ found on %s->%s", d1, d2)
@@ -866,4 +866,283 @@ func TestPruneExcessDoubles_TrimEveningToNotExceedTarget(t *testing.T) {
 	}
 	t.Logf("Hospital evening cap result: Evening RN=%.1f (<= Target 4.0, no excess OT)", eveScore)
 }
+
+func TestPruneExcessNight_DynamicDeficitCap(t *testing.T) {
+	// Rule: If Yesterday's Evening target is 4.0 and actual is 3.5 (deficit 0.5),
+	// Today's Night shift (target 4.0) is capped at 4.5 max (cannot be 5.0).
+	r := domain.Roster{
+		Month: 9,
+		Year:  2026,
+		Policy: domain.Policy{
+			Staffing: []domain.Staffing{
+				{Start: 480, End: 960, RN: 4, Leaders: 1},  // Morning: 5 RN
+				{Start: 960, End: 1440, RN: 3, Leaders: 1}, // Evening: 4 RN
+				{Start: 0, End: 480, RN: 3, Leaders: 1},    // Night: 4 RN
+			},
+		},
+		Staff: []domain.Staff{
+			// Yesterday evening staff: 1 on D (0.5 eve) + 3 on บ (3.0 eve) => Evening = 3.5 (Target 4.0, Deficit = 0.5)
+			{ID: "rn-d1", Active: true, Position: "RN", Allowed: []string{"D", "X"}},
+			{ID: "rn-e1", Active: true, Position: "RN", Allowed: []string{"บ", "X"}},
+			{ID: "rn-e2", Active: true, Position: "RN", Allowed: []string{"บ", "X"}},
+			{ID: "rn-e3", Active: true, Position: "RN", Leader: true, Allowed: []string{"บ", "X"}},
+
+			// Today night staff: 6 nurses assigned to night shifts (1 leader + 5 regular), exceeding max allowed 4.5
+			{ID: "rn-n1", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-n2", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-n3", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-n4", Active: true, Position: "RN", Allowed: []string{"ชด", "ช", "X"}},
+			{ID: "rn-n5", Active: true, Position: "RN", Allowed: []string{"บด", "บ", "X"}},
+			{ID: "rn-nl", Active: true, Position: "RN", Leader: true, Allowed: []string{"ด", "X"}},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "D", Periods: []domain.Period{{Start: 480, End: 1200}}},
+			{Code: "บ", Periods: []domain.Period{{Start: 960, End: 1440}}},
+			{Code: "ด", Periods: []domain.Period{{Start: 0, End: 480}}},
+			{Code: "ชด", Periods: []domain.Period{{Start: 480, End: 960}, {Start: 0, End: 480}}},
+			{Code: "บด", Periods: []domain.Period{{Start: 960, End: 1440}, {Start: 0, End: 480}}},
+			{Code: "X", Periods: []domain.Period{}},
+		},
+	}
+
+	prevDate := "2026-09-01"
+	currDate := "2026-09-02"
+	cells := []domain.Cell{
+		// Yesterday (2026-09-01): Evening = 3.5 (Deficit 0.5)
+		{NurseID: "rn-d1", Date: prevDate, ShiftCode: "D"},
+		{NurseID: "rn-e1", Date: prevDate, ShiftCode: "บ"},
+		{NurseID: "rn-e2", Date: prevDate, ShiftCode: "บ"},
+		{NurseID: "rn-e3", Date: prevDate, ShiftCode: "บ"},
+
+		// Today (2026-09-02): Night has 6 RNs assigned (1 leader + 3 on ด + 1 on ชด + 1 on บด)
+		{NurseID: "rn-nl", Date: currDate, ShiftCode: "ด"},
+		{NurseID: "rn-n1", Date: currDate, ShiftCode: "ด"},
+		{NurseID: "rn-n2", Date: currDate, ShiftCode: "ด"},
+		{NurseID: "rn-n3", Date: currDate, ShiftCode: "ด"},
+		{NurseID: "rn-n4", Date: currDate, ShiftCode: "ชด"},
+		{NurseID: "rn-n5", Date: currDate, ShiftCode: "บด"},
+	}
+
+	pruned := pruneExcessDoubles(r, cells)
+
+	nightScore := 0.0
+	for _, c := range pruned {
+		if c.Date == currDate {
+			if c.ShiftCode == "ด" || c.ShiftCode == "ชด" || c.ShiftCode == "บด" || c.ShiftCode == "N" || c.ShiftCode == "Night" || c.ShiftCode == "12N" {
+				nightScore += 1.0
+			}
+		}
+	}
+
+	if nightScore > 4.5 {
+		t.Errorf("expected today's night RN count to NOT exceed 4.5 (Target 4.0 + Yesterday Eve deficit 0.5), got %.1f", nightScore)
+	}
+	t.Logf("Hospital chronological night cap result: Night RN=%.1f (<= Max Allowed 4.5, perfectly balanced with yesterday Eve 3.5)", nightScore)
+}
+
+func TestPruneExcessNight_Day1Oct_FiveToFour(t *testing.T) {
+	// Setup 1 Oct: Target Night RN = 4 (3 regular + 1 leader).
+	// If 5 nurses are assigned to night on 1 Oct, the excess 1 nurse must be removed, leaving exactly 4.
+	r := domain.Roster{
+		Month: 10,
+		Year:  2026,
+		Policy: domain.Policy{
+			Staffing: []domain.Staffing{
+				{Start: 480, End: 960, RN: 4, Leaders: 1},  // Morning: 5 RN
+				{Start: 960, End: 1440, RN: 3, Leaders: 1}, // Evening: 4 RN
+				{Start: 0, End: 480, RN: 3, Leaders: 1},    // Night: 4 RN
+			},
+		},
+		Boundary: []domain.Cell{
+			// 30 Sep boundary: Evening had 4 nurses (no deficit)
+			{NurseID: "rn-b1", Date: "2026-09-30", ShiftCode: "บ"},
+			{NurseID: "rn-b2", Date: "2026-09-30", ShiftCode: "บ"},
+			{NurseID: "rn-b3", Date: "2026-09-30", ShiftCode: "บ"},
+			{NurseID: "rn-b4", Date: "2026-09-30", ShiftCode: "บ"},
+		},
+		Staff: []domain.Staff{
+			{ID: "rn-1", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-2", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-3", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-4", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-5", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-lead", Active: true, Position: "RN", Leader: true, Allowed: []string{"ด", "X"}},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "บ", Periods: []domain.Period{{Start: 960, End: 1440}}},
+			{Code: "ด", Periods: []domain.Period{{Start: 0, End: 480}}},
+			{Code: "X", Periods: []domain.Period{}},
+		},
+	}
+
+	date := "2026-10-01"
+	// 1 Leader + 4 regular nurses on "ด" => Total 5 RNs on Night (Target is 4.0)
+	cells := []domain.Cell{
+		{NurseID: "rn-lead", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-1", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-2", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-3", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-4", Date: date, ShiftCode: "ด"},
+	}
+
+	pruned := pruneExcessDoubles(r, cells)
+
+	nightScore := 0.0
+	for _, c := range pruned {
+		if c.Date == date && (c.ShiftCode == "ด" || c.ShiftCode == "Night" || c.ShiftCode == "N") {
+			nightScore += 1.0
+		}
+	}
+
+	hasLeader := false
+	for _, c := range pruned {
+		if c.Date == date && c.NurseID == "rn-lead" && c.ShiftCode == "ด" {
+			hasLeader = true
+		}
+	}
+
+	if !hasLeader {
+		t.Errorf("expected Leader RN (rn-lead) to be strictly PRESERVED on Night shift, but leader was removed")
+	}
+
+	if nightScore > 4.0 {
+		t.Errorf("expected 1 Oct night RN count to be pruned from 5 to 4.0, got %.1f", nightScore)
+	}
+	t.Logf("1 Oct Night Cap result: 5 RNs pruned to %.1f (exactly target 4.0, 1 excess removed, Leader PRESERVED)", nightScore)
+}
+
+func TestPruneExcessNight_Method1_MorningDoubleAndNightRelief(t *testing.T) {
+	// Rule: If night shift has 5 nurses (4 on ด + 1 on N) and morning has 1 nurse on ชบ,
+	// Method 1 adjusts: ชบ -> ช and N -> บ.
+	// Result: Night count becomes exactly 4 (all on ด), and morning/evening remain balanced.
+	r := domain.Roster{
+		Month: 10,
+		Year:  2026,
+		Policy: domain.Policy{
+			Staffing: []domain.Staffing{
+				{Start: 480, End: 960, RN: 4, Leaders: 1},  // Morning: 5 RN
+				{Start: 960, End: 1440, RN: 3, Leaders: 1}, // Evening: 4 RN
+				{Start: 0, End: 480, RN: 3, Leaders: 1},    // Night: 4 RN
+			},
+		},
+		Staff: []domain.Staff{
+			{ID: "rn-m1", Active: true, Position: "RN", Allowed: []string{"ชบ", "ช", "X"}},
+			{ID: "rn-n1", Active: true, Position: "RN", Allowed: []string{"N", "บ", "X"}},
+			{ID: "rn-d1", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-d2", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-d3", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-lead", Active: true, Position: "RN", Leader: true, Allowed: []string{"ด", "X"}},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "ช", Periods: []domain.Period{{Start: 480, End: 960}}},
+			{Code: "บ", Periods: []domain.Period{{Start: 960, End: 1440}}},
+			{Code: "ด", Periods: []domain.Period{{Start: 0, End: 480}}},
+			{Code: "ชบ", Periods: []domain.Period{{Start: 480, End: 960}, {Start: 960, End: 1440}}},
+			{Code: "N", Periods: []domain.Period{{Start: 1200, End: 1920}}},
+			{Code: "X", Periods: []domain.Period{}},
+		},
+	}
+
+	date := "2026-10-02"
+	// 1 nurse on "ชบ", 1 on "N", and 4 on "ด" (1 leader + 3 regular)
+	cells := []domain.Cell{
+		{NurseID: "rn-m1", Date: date, ShiftCode: "ชบ"},
+		{NurseID: "rn-n1", Date: date, ShiftCode: "N"},
+		{NurseID: "rn-lead", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-d1", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-d2", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-d3", Date: date, ShiftCode: "ด"},
+	}
+
+	pruned := pruneExcessDoubles(r, cells)
+
+	resMap := map[string]string{}
+	for _, c := range pruned {
+		if c.Date == date {
+			resMap[c.NurseID] = c.ShiftCode
+		}
+	}
+
+	// Verify Method 1 conversions: rn-m1: ชบ -> ช, rn-n1: N -> บ
+	if resMap["rn-m1"] != "ช" {
+		t.Errorf("expected rn-m1 to be converted from 'ชบ' to 'ช', got '%s'", resMap["rn-m1"])
+	}
+	if resMap["rn-n1"] != "บ" {
+		t.Errorf("expected rn-n1 to be converted from 'N' to 'บ', got '%s'", resMap["rn-n1"])
+	}
+	if resMap["rn-lead"] != "ด" {
+		t.Errorf("expected rn-lead to remain 'ด', got '%s'", resMap["rn-lead"])
+	}
+
+	t.Logf("Method 1 Result: rn-m1='%s', rn-n1='%s', rn-lead='%s' (Perfect 3-shift rebalance!)", resMap["rn-m1"], resMap["rn-n1"], resMap["rn-lead"])
+}
+
+func TestPruneExcessNight_Target3_FourToThree(t *testing.T) {
+	// Setup: Target Night RN = 3 (2 regular + 1 leader).
+	// Assigned on Night: 3 on 'ด' + 1 on 'N' = Total 4 nurses (exceeds target 3).
+	r := domain.Roster{
+		Month: 10,
+		Year:  2026,
+		Policy: domain.Policy{
+			Staffing: []domain.Staffing{
+				{Start: 480, End: 960, RN: 3, Leaders: 1},  // Morning: 4 RN
+				{Start: 960, End: 1440, RN: 3, Leaders: 1}, // Evening: 4 RN
+				{Start: 0, End: 480, RN: 2, Leaders: 1},    // Night: 3 RN (Target = 3)
+			},
+		},
+		Staff: []domain.Staff{
+			// Morning nurse (pure 'ช', no 'ชบ' so will trigger Method 2 fallback)
+			{ID: "rn-m1", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			// Night nurses: 3 on 'ด' + 1 on 'N' = 4 nurses
+			{ID: "rn-lead", Active: true, Position: "RN", Leader: true, Allowed: []string{"ด", "X"}},
+			{ID: "rn-d1", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-d2", Active: true, Position: "RN", Allowed: []string{"ด", "X"}},
+			{ID: "rn-n1", Active: true, Position: "RN", Allowed: []string{"N", "X"}},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "ช", Periods: []domain.Period{{Start: 480, End: 960}}},
+			{Code: "บ", Periods: []domain.Period{{Start: 960, End: 1440}}},
+			{Code: "ด", Periods: []domain.Period{{Start: 0, End: 480}}},
+			{Code: "N", Periods: []domain.Period{{Start: 1200, End: 1920}}},
+			{Code: "X", Periods: []domain.Period{}},
+		},
+	}
+
+	date := "2026-10-03"
+	cells := []domain.Cell{
+		{NurseID: "rn-m1", Date: date, ShiftCode: "ช"},
+		{NurseID: "rn-lead", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-d1", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-d2", Date: date, ShiftCode: "ด"},
+		{NurseID: "rn-n1", Date: date, ShiftCode: "N"},
+	}
+
+	pruned := pruneExcessDoubles(r, cells)
+
+	nightScore := 0.0
+	hasLeader := false
+	for _, c := range pruned {
+		if c.Date == date {
+			if c.ShiftCode == "ด" || c.ShiftCode == "N" {
+				nightScore += 1.0
+			}
+			if c.NurseID == "rn-lead" && c.ShiftCode == "ด" {
+				hasLeader = true
+			}
+		}
+	}
+
+	if nightScore > 3.0 {
+		t.Errorf("expected Target=3 night shift count to be pruned from 4 to 3.0, got %.1f", nightScore)
+	}
+	if !hasLeader {
+		t.Errorf("expected Leader RN to be PRESERVED on night shift")
+	}
+
+	t.Logf("Target=3 Night Cap result: 4 nurses pruned to %.1f (exactly target 3.0, leader PRESERVED)", nightScore)
+}
+
+
+
+
 

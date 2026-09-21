@@ -286,7 +286,7 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
                 </div>
               </th>
 
-              {dates.map((date) => {
+              {dates.map((date, dateIdx) => {
                 const comp = computedDaily[date]?.[period.key];
                 const actualRN = comp ? comp.actualRN : 0;
                 const targetRN = comp ? comp.targetRN : 0;
@@ -295,20 +295,33 @@ export function CoverageSummaryRow({ dates, rosterId, token, roster }: Props) {
                 const actual = comp ? comp.actual : 0;
                 const target = comp ? comp.target : 0;
 
+                // For Night period (00:00 - 08:00): calculate deficit from immediately preceding shift (Yesterday Evening: 16:00 - 24:00)
+                // Night shift can reach Target + PrevEveDeficit (e.g. 4 + 0.5 = 4.5) without being marked as overstaffed.
+                // But exceeding 4.5 (e.g. 5.0) will be flagged as overstaffed.
+                const prevDate = dateIdx > 0 ? dates[dateIdx - 1] : "";
+                const compPrevEve = prevDate ? computedDaily[prevDate]?.["afternoon"] : undefined;
+                const eveDeficitRN = period.key === "night" && compPrevEve ? Math.max(0, (compPrevEve.targetRN || 0) - (compPrevEve.actualRN || 0)) : 0;
+                const eveDeficitPN = period.key === "night" && compPrevEve ? Math.max(0, (compPrevEve.targetPN || 0) - (compPrevEve.actualPN || 0)) : 0;
+                const eveDeficitTotal = period.key === "night" && compPrevEve ? Math.max(0, (compPrevEve.target || 0) - (compPrevEve.actual || 0)) : 0;
+
+                const maxAllowedRN = targetRN + eveDeficitRN;
+                const maxAllowedPN = targetPN + eveDeficitPN;
+                const maxAllowedTotal = target + eveDeficitTotal;
+
                 const isShortRN = period.key === "afternoon"
                   ? (targetRN > 0 && actualRN < targetRN - 0.501)
                   : (targetRN > 0 && actualRN < targetRN - 0.001);
-                const isOverRN = targetRN > 0 && actualRN > targetRN + 0.001;
+                const isOverRN = targetRN > 0 && actualRN > maxAllowedRN + 0.001;
 
                 const isShortPN = period.key === "afternoon"
                   ? (targetPN > 0 && actualPN < targetPN - 0.501)
                   : (targetPN > 0 && actualPN < targetPN - 0.001);
-                const isOverPN = targetPN > 0 && actualPN > targetPN + 0.001;
+                const isOverPN = targetPN > 0 && actualPN > maxAllowedPN + 0.001;
 
                 const isTotalShort = period.key === "afternoon"
                   ? (target > 0 && actual < target - 0.501)
                   : (target > 0 && actual < target - 0.001);
-                const isTotalOver = target > 0 && actual > target + 0.001;
+                const isTotalOver = target > 0 && actual > maxAllowedTotal + 0.001;
 
                 return (
                   <td
