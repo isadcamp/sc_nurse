@@ -41,9 +41,13 @@ export function PayrollDrilldownModal({
   onClose,
 }: PayrollDrilldownModalProps) {
   const comp = roster?.policy?.compensation || {};
-  const isPN = nurse?.position?.toUpperCase() === "PN";
-  const eveRate = isPN ? (comp.pnEveNightRate ?? 180) : (comp.rnEveNightRate ?? 240);
-  const rawOtRate = isPN ? (comp.pnOtRate ?? 75) : (comp.rnOtRate ?? 100);
+  const isPN = /PN|PRACTICAL|ผู้ช่วย/i.test(nurse?.position || "");
+  const eveRate = isPN
+    ? (comp.pnEveNightRate !== undefined ? comp.pnEveNightRate : 180)
+    : (comp.rnEveNightRate !== undefined ? comp.rnEveNightRate : 240);
+  const rawOtRate = isPN
+    ? (comp.pnOtRate !== undefined ? comp.pnOtRate : 75)
+    : (comp.rnOtRate !== undefined ? comp.rnOtRate : 100);
   const otHourlyRate = rawOtRate > 250 ? Math.round(rawOtRate / 8) : rawOtRate;
   const allowanceCap = comp.allowanceCap ?? 0;
   const workingDays = comp.workingDays && comp.workingDays > 0 ? comp.workingDays : 22;
@@ -59,11 +63,7 @@ export function PayrollDrilldownModal({
     const month = roster.month || 9;
     const daysInMonth = new Date(year, month, 0).getDate();
 
-    const targetObj = Array.isArray(roster.policy?.targets)
-      ? (roster.policy.targets as Array<{ nurseId: string; hours: number }>).find((t) => t.nurseId === nurse.id)
-      : undefined;
-
-    const standardHours = targetObj?.hours && targetObj.hours > 0 ? targetObj.hours : workingDays * 8;
+    const standardHours = workingDays * 8;
 
     const cellMap = new Map<string, Cell>();
     for (const c of roster.assignments || []) {

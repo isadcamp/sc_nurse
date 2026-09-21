@@ -56,12 +56,12 @@ type Staffing struct {
 	Skills  map[string]int `json:"skills"`
 }
 type CompensationConfig struct {
-	WorkingDays    int     `json:"workingDays,omitempty"`
-	AllowanceCap   float64 `json:"allowanceCap,omitempty"`
-	RNEveNightRate float64 `json:"rnEveNightRate,omitempty"`
-	PNEveNightRate float64 `json:"pnEveNightRate,omitempty"`
-	RNOTRate       float64 `json:"rnOtRate,omitempty"`
-	PNOTRate       float64 `json:"pnOtRate,omitempty"`
+	WorkingDays    int     `json:"workingDays"`
+	AllowanceCap   float64 `json:"allowanceCap"`
+	RNEveNightRate float64 `json:"rnEveNightRate"`
+	PNEveNightRate float64 `json:"pnEveNightRate"`
+	RNOTRate       float64 `json:"rnOtRate"`
+	PNOTRate       float64 `json:"pnOtRate"`
 }
 
 type Policy struct {

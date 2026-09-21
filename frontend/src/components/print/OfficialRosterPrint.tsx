@@ -241,7 +241,7 @@ export function OfficialRosterPrint({
             </thead>
             <tbody>
               {displayedStats.map((item, idx) => (
-                <tr key={item.staff.id} className="border-b border-slate-800 hover:bg-slate-50">
+                <tr key={`${item.staff.id || "staff"}_${idx}`} className="border-b border-slate-800 hover:bg-slate-50">
                   <td className="border border-slate-800 p-1 text-center font-medium">{idx + 1}</td>
                   <td className="border border-slate-800 p-1 text-left font-semibold truncate max-w-[140px]">
                     {item.staff.name}

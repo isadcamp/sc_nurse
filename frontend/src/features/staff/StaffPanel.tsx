@@ -617,7 +617,7 @@ export function StaffPanel({
                       const isRN = nurse.position === "RN";
                       return (
                         <tr
-                          key={nurse.id}
+                          key={`${nurse.id || "nurse"}_${idx}`}
                           className={`hover:bg-slate-50/80 transition ${!nurse.isActive ? "bg-slate-50/40 opacity-70" : ""}`}
                         >
                           <td className="py-3 px-4 text-center font-bold text-slate-400">
@@ -666,8 +666,8 @@ export function StaffPanel({
                           <td className="py-3 px-3">
                             {nurse.skills && nurse.skills.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
-                                {nurse.skills.map((sk) => (
-                                  <span key={sk} className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-semibold">
+                                {nurse.skills.map((sk, skIdx) => (
+                                  <span key={`${sk}_${skIdx}`} className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded text-[10px] font-semibold">
                                     {sk}
                                   </span>
                                 ))}
@@ -684,8 +684,8 @@ export function StaffPanel({
                               )
                                 .filter((s) => s !== "X" && s !== "L")
                                 .slice(0, 5)
-                                .map((s) => (
-                                  <span key={s} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold">
+                                .map((s, sIdx) => (
+                                  <span key={`${s}_${sIdx}`} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold">
                                     {s}
                                   </span>
                                 ))}

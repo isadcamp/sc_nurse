@@ -346,10 +346,10 @@ export function UserManagementModal({ open, onClose, token, wards }: UserManagem
                         </td>
                       </tr>
                     ) : (
-                      filteredUsers.map((u) => {
+                      filteredUsers.map((u, uIdx) => {
                         const rBadge = roleBadgeConfig[u.role] || roleBadgeConfig.viewer;
                         return (
-                          <tr key={u.id} className="hover:bg-slate-50/80 transition">
+                          <tr key={`${u.id || "user"}_${uIdx}`} className="hover:bg-slate-50/80 transition">
                             <td className="py-3 px-4 font-mono font-bold text-slate-800">
                               {u.username}
                             </td>
@@ -367,9 +367,9 @@ export function UserManagementModal({ open, onClose, token, wards }: UserManagem
                                 <span className="text-[11px] text-purple-600 font-semibold">เข้าถึงได้ทุกแผนก</span>
                               ) : u.wards && u.wards.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {u.wards.map((wid) => (
+                                  {u.wards.map((wid, wIdx) => (
                                     <span
-                                      key={wid}
+                                      key={`${wid}_${wIdx}`}
                                       className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded text-[10px] font-mono border border-slate-200"
                                     >
                                       {wid}

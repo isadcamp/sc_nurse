@@ -80,9 +80,9 @@ export function NurseStatsColumn({
     }
   }
 
-  // Monthly working days baseline
+  // Monthly working days baseline (e.g. 22 days = 176 hours)
   const workingDays = compensation?.workingDays && compensation.workingDays > 0 ? compensation.workingDays : 22;
-  const standardHours = targetHours > 0 ? targetHours : workingDays * 8;
+  const standardHours = workingDays * 8;
   const leaveCreditHours = leave * 8;
   const creditHours = actualWorkHours + leaveCreditHours;
   const variance = creditHours - standardHours;
@@ -96,9 +96,13 @@ export function NurseStatsColumn({
   const excessEveNightShifts = allowanceCap > 0 ? Math.max(0, calculatedEveNightShifts - allowanceCap) : 0;
 
   // Role-based rates
-  const isPN = position.toUpperCase() === "PN";
-  const eveRate = isPN ? (compensation?.pnEveNightRate ?? 180) : (compensation?.rnEveNightRate ?? 240);
-  const rawOtRate = isPN ? (compensation?.pnOtRate ?? 75) : (compensation?.rnOtRate ?? 100);
+  const isPN = /PN|PRACTICAL|ผู้ช่วย/i.test(position || "");
+  const eveRate = isPN
+    ? (compensation?.pnEveNightRate !== undefined ? compensation.pnEveNightRate : 180)
+    : (compensation?.rnEveNightRate !== undefined ? compensation.rnEveNightRate : 240);
+  const rawOtRate = isPN
+    ? (compensation?.pnOtRate !== undefined ? compensation.pnOtRate : 75)
+    : (compensation?.rnOtRate !== undefined ? compensation.rnOtRate : 100);
   const otHourlyRate = rawOtRate > 250 ? Math.round(rawOtRate / 8) : rawOtRate;
 
   const eveNightPay = payableEveNightShifts * eveRate;

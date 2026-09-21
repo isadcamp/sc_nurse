@@ -306,11 +306,15 @@ func loadRoster(ctx context.Context, q queryer, id int64) (domain.Roster, error)
 	} else if e != nil {
 		return r, e
 	}
+	savedCompensation := r.Policy.Compensation
 	if e = json.Unmarshal(policy, &r.Policy); e != nil {
 		_ = json.Unmarshal([]byte(defaultPolicyJSON), &r.Policy)
+	} else {
+		savedCompensation = r.Policy.Compensation
 	}
 	if !validation.PolicyValid(r.Policy) {
 		_ = json.Unmarshal([]byte(defaultPolicyJSON), &r.Policy)
+		r.Policy.Compensation = savedCompensation
 	}
 	rows, e := q.QueryContext(ctx, "SELECT id,name,position,is_charge_eligible,can_double_shift,is_part_time,is_active,COALESCE(skills,'[]'),COALESCE(allowed_shift_codes,'[]') FROM nurses WHERE ward_id=? ORDER BY id", r.WardID)
 	if e != nil {

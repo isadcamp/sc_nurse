@@ -34,26 +34,27 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
   };
 
   const initRnOtRate = () => {
-    if (!comp.rnOtRate) return 100;
+    if (comp.rnOtRate === undefined) return 100;
     return comp.rnOtRate > 250 ? Math.round(comp.rnOtRate / 8) : comp.rnOtRate;
   };
 
   const initPnOtRate = () => {
-    if (!comp.pnOtRate) return 75;
+    if (comp.pnOtRate === undefined) return 75;
     return comp.pnOtRate > 250 ? Math.round(comp.pnOtRate / 8) : comp.pnOtRate;
   };
 
-  const [workingDays, setWorkingDays] = useState<number>(defaultWorkingDays);
-  const [allowanceCap, setAllowanceCap] = useState<number>(comp.allowanceCap ?? 0);
-  const [rnEveNightRate, setRnEveNightRate] = useState<number>(comp.rnEveNightRate ?? 240);
-  const [pnEveNightRate, setPnEveNightRate] = useState<number>(comp.pnEveNightRate ?? 180);
-  const [rnOtRate, setRnOtRate] = useState<number>(initRnOtRate);
-  const [pnOtRate, setPnOtRate] = useState<number>(initPnOtRate);
+  const [workingDays, setWorkingDays] = useState<number | "">(defaultWorkingDays);
+  const [allowanceCap, setAllowanceCap] = useState<number | "">(comp.allowanceCap ?? 0);
+  const [rnEveNightRate, setRnEveNightRate] = useState<number | "">(comp.rnEveNightRate !== undefined ? comp.rnEveNightRate : 240);
+  const [pnEveNightRate, setPnEveNightRate] = useState<number | "">(comp.pnEveNightRate !== undefined ? comp.pnEveNightRate : 180);
+  const [rnOtRate, setRnOtRate] = useState<number | "">(initRnOtRate);
+  const [pnOtRate, setPnOtRate] = useState<number | "">(initPnOtRate);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const baseHours = workingDays * 8;
+  const numWorkingDays = Number(workingDays || 0);
+  const baseHours = numWorkingDays * 8;
 
   async function handleSave() {
     setBusy(true);
@@ -61,13 +62,31 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
     try {
       const payload = {
         ...currentPolicy,
+        status: currentPolicy.status || "confirmed",
+        version: currentPolicy.version || "v1.0",
+        effectiveFrom: currentPolicy.effectiveFrom || "2020-01-01",
+        effectiveTo: currentPolicy.effectiveTo || "2099-12-31",
+        minRestHours: currentPolicy.minRestHours ?? 8,
+        maxConsecutiveDays: currentPolicy.maxConsecutiveDays ?? 6,
+        maxConsecutiveNights: currentPolicy.maxConsecutiveNights ?? 3,
+        maxConsecutiveOffDays: currentPolicy.maxConsecutiveOffDays ?? 2,
+        maxMonthlyHours: currentPolicy.maxMonthlyHours && currentPolicy.maxMonthlyHours > 0 ? currentPolicy.maxMonthlyHours : 240,
+        maxContinuousHours: currentPolicy.maxContinuousHours ?? 16,
+        maxDoubleShifts: currentPolicy.maxDoubleShifts ?? 8,
+        nightStart: currentPolicy.nightStart ?? 1320,
+        nightEnd: currentPolicy.nightEnd ?? 1800,
+        fairnessHours: currentPolicy.fairnessHours ?? 48,
+        weights: currentPolicy.weights || { coverage: 100, fairness: 50, preference: 20, stability: 10 },
+        targets: currentPolicy.targets || [],
+        preferences: currentPolicy.preferences || [],
+        staffing: currentPolicy.staffing || [],
         compensation: {
-          workingDays: Number(workingDays),
-          allowanceCap: Number(allowanceCap),
-          rnEveNightRate: Number(rnEveNightRate),
-          pnEveNightRate: Number(pnEveNightRate),
-          rnOtRate: Number(rnOtRate),
-          pnOtRate: Number(pnOtRate),
+          workingDays: Number(workingDays || 0),
+          allowanceCap: Number(allowanceCap || 0),
+          rnEveNightRate: Number(rnEveNightRate || 0),
+          pnEveNightRate: Number(pnEveNightRate || 0),
+          rnOtRate: Number(rnOtRate || 0),
+          pnOtRate: Number(pnOtRate || 0),
         },
       };
 
@@ -152,14 +171,14 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                       min={1}
                       max={31}
                       value={workingDays}
-                      onChange={(e) => setWorkingDays(Math.max(1, Number(e.target.value)))}
+                      onChange={(e) => setWorkingDays(e.target.value === "" ? "" : Math.max(1, Number(e.target.value)))}
                       className="w-20 px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     />
                     <span className="text-xs text-slate-600 font-medium">วัน</span>
                   </div>
 
                   <div className="text-xs text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-slate-200 font-medium">
-                    = <span className="font-bold text-indigo-600">{baseHours}</span> ชม. ปกติ ({workingDays} เวร)
+                    = <span className="font-bold text-indigo-600">{baseHours}</span> ชม. ปกติ ({numWorkingDays} เวร)
                   </div>
                 </div>
 
@@ -193,7 +212,7 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                     <span>เพดานสิทธิเบิกค่าเวร บด ประจำเดือน (Allowance Cap)</span>
                   </div>
                   <span className="text-[11px] bg-purple-100 text-purple-800 font-bold px-2 py-0.5 rounded-md">
-                    {allowanceCap > 0 ? `จำกัด ${allowanceCap} วัน` : "ไม่จำกัดเพดาน"}
+                    {Number(allowanceCap) > 0 ? `จำกัด ${allowanceCap} วัน` : "ไม่จำกัดเพดาน"}
                   </span>
                 </div>
 
@@ -211,14 +230,14 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                       min={0}
                       max={31}
                       value={allowanceCap}
-                      onChange={(e) => setAllowanceCap(Math.max(0, Number(e.target.value)))}
+                      onChange={(e) => setAllowanceCap(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
                       className="w-20 px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-white border border-purple-300 rounded-lg text-center focus:ring-2 focus:ring-purple-500 focus:outline-none"
                     />
                     <span className="text-xs text-slate-600 font-medium">วัน/หน่วย</span>
                   </div>
 
                   <span className="text-[11px] text-purple-700 italic">
-                    {allowanceCap === 0 ? "*(ใส่ 0 = เบิกได้ไม่จำกัด)" : ""}
+                    {Number(allowanceCap) === 0 ? "*(ใส่ 0 = เบิกได้ไม่จำกัด)" : ""}
                   </span>
                 </div>
 
@@ -265,10 +284,26 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                       min={0}
                       step={10}
                       value={rnEveNightRate}
-                      onChange={(e) => setRnEveNightRate(Number(e.target.value))}
+                      onChange={(e) => setRnEveNightRate(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
                       className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
                     <span className="text-slate-500 text-[11px] whitespace-nowrap font-medium">บาท/เวร</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[180, 200, 240, 300].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRnEveNightRate(r)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded border font-semibold cursor-pointer ${
+                          rnEveNightRate === r
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -282,13 +317,13 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                       min={0}
                       step={5}
                       value={rnOtRate}
-                      onChange={(e) => setRnOtRate(Number(e.target.value))}
+                      onChange={(e) => setRnOtRate(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
                       className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
                     <span className="text-emerald-700 font-bold text-[11px] whitespace-nowrap">บาท/ชม.</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-emerald-700 mt-1">
-                    <span>~{(rnOtRate * 8).toLocaleString()} บ./เวร (8 ชม.)</span>
+                    <span>~{(Number(rnOtRate || 0) * 8).toLocaleString()} บ./เวร (8 ชม.)</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     {[80, 100, 120, 150].map((r) => (
@@ -330,10 +365,26 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                       min={0}
                       step={10}
                       value={pnEveNightRate}
-                      onChange={(e) => setPnEveNightRate(Number(e.target.value))}
+                      onChange={(e) => setPnEveNightRate(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
                       className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-sky-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                     />
                     <span className="text-slate-500 text-[11px] whitespace-nowrap font-medium">บาท/เวร</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[0, 120, 150, 180, 200].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setPnEveNightRate(r)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded border font-semibold cursor-pointer ${
+                          pnEveNightRate === r
+                            ? "bg-sky-600 text-white border-sky-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-sky-50"
+                        }`}
+                      >
+                        {r === 0 ? "0" : r}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -347,16 +398,16 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                       min={0}
                       step={5}
                       value={pnOtRate}
-                      onChange={(e) => setPnOtRate(Number(e.target.value))}
+                      onChange={(e) => setPnOtRate(e.target.value === "" ? "" : Math.max(0, Number(e.target.value)))}
                       className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-sky-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                     />
                     <span className="text-sky-700 font-bold text-[11px] whitespace-nowrap">บาท/ชม.</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-sky-700 mt-1">
-                    <span>~{(pnOtRate * 8).toLocaleString()} บ./เวร (8 ชม.)</span>
+                    <span>~{(Number(pnOtRate || 0) * 8).toLocaleString()} บ./เวร (8 ชม.)</span>
                   </div>
                   <div className="flex items-center gap-1 mt-1">
-                    {[60, 75, 90, 100].map((r) => (
+                    {[50, 60, 75, 90, 100].map((r) => (
                       <button
                         key={r}
                         type="button"
@@ -388,7 +439,7 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
               <div>• <strong>เงิน OT:</strong> OT × 8 × ค่าเวรล่วงเวลา (OT ต่อชั่วโมง) (แยกตาม RN, PN)</div>
               <div>• <strong>รวมเงินสุทธิ:</strong> ค่าเวร (บ/ด) + เงิน OT</div>
               <div>• <strong>การนับหน่วย บ/ด:</strong> บ (1.0), ด (1.0), Day 12h (0.5), Night 12h (1.5), ชบ (1.0), บด (2.0)</div>
-              <div>• <strong>เพดานสิทธิเบิก:</strong> {allowanceCap > 0 ? `จำกัดสิทธิเบิกค่าเวรสูงสุดไม่เกิน ${allowanceCap} หน่วย/เดือน` : "เบิกได้ตามจริงไม่จำกัดเพดาน"}</div>
+              <div>• <strong>เพดานสิทธิเบิก:</strong> {Number(allowanceCap) > 0 ? `จำกัดสิทธิเบิกค่าเวรสูงสุดไม่เกิน ${allowanceCap} หน่วย/เดือน` : "เบิกได้ตามจริงไม่จำกัดเพดาน"}</div>
             </div>
           </div>
         </div>

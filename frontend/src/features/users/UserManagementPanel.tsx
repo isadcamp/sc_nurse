@@ -365,10 +365,10 @@ export function UserManagementPanel({ token, wards, onBackToGrid }: UserManageme
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((u) => {
+                  filteredUsers.map((u, uIdx) => {
                     const rBadge = roleBadgeConfig[u.role] || roleBadgeConfig.viewer;
                     return (
-                      <tr key={u.id} className="hover:bg-slate-50/80 transition-colors">
+                      <tr key={`${u.id || "user"}_${uIdx}`} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-4 font-mono font-bold text-slate-900">
                           {u.username}
                         </td>
@@ -388,9 +388,9 @@ export function UserManagementPanel({ token, wards, onBackToGrid }: UserManageme
                             </span>
                           ) : u.wards && u.wards.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
-                              {u.wards.map((wid) => (
+                              {u.wards.map((wid, wIdx) => (
                                 <span
-                                  key={wid}
+                                  key={`${wid}_${wIdx}`}
                                   className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-mono font-bold border border-slate-200"
                                 >
                                   {wid}

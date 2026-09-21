@@ -431,11 +431,11 @@ export function StaffModal({
                   สิทธิ์การขึ้นประเภทเวร (Allowed Shifts)
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {ALL_SHIFTS.filter((s) => s !== "X" && s !== "L").map((code) => {
+                  {ALL_SHIFTS.filter((s) => s !== "X" && s !== "L").map((code, cIdx) => {
                     const isChecked = formAllowedShifts.includes(code);
                     return (
                       <label
-                        key={code}
+                        key={`${code}_${cIdx}`}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs cursor-pointer transition ${
                           isChecked
                             ? "bg-blue-50 border-blue-300 text-blue-800 font-bold"
@@ -570,7 +570,7 @@ export function StaffModal({
                           const serialNumber = startIndex + index + 1;
                           return (
                             <tr
-                              key={nurse.id}
+                              key={`${nurse.id || "nurse"}_${index}`}
                               className={`hover:bg-slate-50 transition ${
                                 !nurse.isActive ? "bg-slate-50/50 text-slate-400" : ""
                               }`}
@@ -634,9 +634,9 @@ export function StaffModal({
                                       ⚡ เวรควบ
                                     </span>
                                   )}
-                                  {(nurse.skills || []).map((sk) => (
+                                  {(nurse.skills || []).map((sk, skIdx) => (
                                     <span
-                                      key={sk}
+                                      key={`${sk}_${skIdx}`}
                                       className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium"
                                     >
                                       🏷️ {sk}

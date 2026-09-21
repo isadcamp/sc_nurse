@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"nurse-scheduler/backend/internal/domain"
 	"nurse-scheduler/backend/internal/validation"
+	"strings"
 	"time"
 )
 
@@ -82,16 +83,18 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 		}
 	}
 
-	rnEveRate := r.Policy.Compensation.RNEveNightRate
-	if rnEveRate == 0 {
-		rnEveRate = 240
+	hasCompConfig := r.Policy.Compensation.WorkingDays > 0 || r.Policy.Compensation.RNEveNightRate > 0 || r.Policy.Compensation.RNOTRate > 0 || r.Policy.Compensation.PNEveNightRate > 0 || r.Policy.Compensation.PNOTRate > 0
+	rnEveRate := 240.0
+	pnEveRate := 180.0
+	rnOtHourlyRate := 100.0
+	pnOtHourlyRate := 75.0
+
+	if hasCompConfig {
+		rnEveRate = r.Policy.Compensation.RNEveNightRate
+		pnEveRate = r.Policy.Compensation.PNEveNightRate
+		rnOtHourlyRate = getHourlyOTRate(r.Policy.Compensation.RNOTRate, 0)
+		pnOtHourlyRate = getHourlyOTRate(r.Policy.Compensation.PNOTRate, 0)
 	}
-	pnEveRate := r.Policy.Compensation.PNEveNightRate
-	if pnEveRate == 0 {
-		pnEveRate = 180
-	}
-	rnOtHourlyRate := getHourlyOTRate(r.Policy.Compensation.RNOTRate, 100)
-	pnOtHourlyRate := getHourlyOTRate(r.Policy.Compensation.PNOTRate, 75)
 
 	// 1. Calculate Nurse Stats
 	nurseStats := make([]domain.NurseMonthStat, 0, len(r.Staff))
@@ -165,9 +168,7 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 		creditHours := actualWorkHours + leaveCreditHours
 
 		targetHours := baselineHours
-		if t, ok := targetMap[nurse.ID]; ok && t.Hours > 0 {
-			targetHours = t.Hours
-		} else if nurse.StartDate != "" || nurse.EndDate != "" {
+		if nurse.StartDate != "" || nurse.EndDate != "" {
 			// Prorate standard working days within active date window
 			proratedWorkingDays := 0
 			daysInMonth := time.Date(r.Year, time.Month(r.Month)+1, 0, 0, 0, 0, 0, time.UTC).Day()
@@ -209,7 +210,8 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 		}
 
 		// Role-based rates
-		isPN := nurse.Position == "PN" || nurse.Position == "pn"
+		posUpper := strings.ToUpper(nurse.Position)
+		isPN := posUpper == "PN" || strings.Contains(posUpper, "PN") || strings.Contains(nurse.Position, "ผู้ช่วย") || strings.Contains(posUpper, "PRACTICAL")
 		eveRate := rnEveRate
 		otHourlyRate := rnOtHourlyRate
 		if isPN {
@@ -538,7 +540,7 @@ func minInt(a, b int) int {
 // getHourlyOTRate parses OT rate, handling both hourly rate (e.g. 100 ฿/hr, 75 ฿/hr)
 // and legacy 8-hour shift rate (e.g. 800 ฿/8h -> 100 ฿/hr, 600 ฿/8h -> 75 ฿/hr).
 func getHourlyOTRate(rate float64, defaultHourly float64) float64 {
-	if rate <= 0 {
+	if rate < 0 || (rate == 0 && defaultHourly > 0) {
 		return defaultHourly
 	}
 	if rate > 250 {

@@ -187,7 +187,7 @@ export function BoundaryModal({ open, onClose, roster, token, onSaved }: Boundar
                 const currentShift = shifts[nurse.id] || "X";
                 return (
                   <div
-                    key={nurse.id}
+                    key={`${nurse.id || "nurse"}_${index}`}
                     className="flex items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-teal-300 transition"
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -220,10 +220,10 @@ export function BoundaryModal({ open, onClose, roster, token, onSaved }: Boundar
                         disabled={busy}
                         className="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
                       >
-                        {availableShifts.map((code) => {
+                        {availableShifts.map((code, cIdx) => {
                           const shiftObj = roster.shifts.find((s) => s.code === code);
                           return (
-                            <option key={code} value={code}>
+                            <option key={`${code}_${cIdx}`} value={code}>
                               {code} {shiftObj?.name ? `(${shiftObj.name.split(" ")[0]})` : ""}
                             </option>
                           );

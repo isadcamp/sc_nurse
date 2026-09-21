@@ -1047,7 +1047,7 @@ const holidaySet = new Set<string>();
                           );
 
                           const renderRow = (nurse: typeof sortedStaff[0], displayIdx: number) => (
-                            <tr key={nurse.id} className="border-b border-slate-200 hover:bg-slate-50/70 transition">
+                            <tr key={`${nurse.id || "nurse"}_${displayIdx}`} className="border-b border-slate-200 hover:bg-slate-50/70 transition">
                               {/* Sticky Nurse Info */}
                               <td className="sticky-nurse-col p-2 text-left">
                                 <div className="flex items-center gap-2">
