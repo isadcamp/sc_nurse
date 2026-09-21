@@ -475,3 +475,11 @@ html, body {
     .nf-print-modal thead { display: table-header-group; }
   }
 }
+
+/* Keep the roster readable without competing with shift colors. */
+.nf-shift-choice { min-height: 44px; font-size: 14px; }
+.nf-cell-button { min-height: 44px; }
+.nf-shift-picker button { min-height: 44px; }
+.matrix-table tbody tr:hover td.sticky-nurse-col { background: #eff6ff; }
+.nf-schedule-tools .nf-toolbar { align-items: flex-start; gap: 12px; }
+.nf-schedule-tools details[open] { padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; }

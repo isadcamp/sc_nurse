@@ -25,6 +25,7 @@ import { LeaveModal } from "@/features/leave/LeaveModal";
 import { LeavePanel } from "@/features/leave/LeavePanel";
 import { BoundaryModal } from "@/features/boundary/BoundaryModal";
 import { ShiftBadge, SHIFT_CONFIGS } from "@/components/schedule/ShiftBadge";
+import { getShiftOptions } from "@/components/schedule/shiftOptions";
 import { QuickShiftPicker } from "@/components/schedule/QuickShiftPicker";
 import { CoverageSummaryRow, computeRosterDailyCoverage } from "@/components/schedule/CoverageSummaryRow";
 import { NurseStatsColumn } from "@/components/schedule/NurseStatsColumn";
@@ -130,30 +131,8 @@ export default function Home() {
     return wards;
   }, [wards, isAdmin, actor]);
 
-  const availablePaletteShifts = useMemo(() => {
-    const defaultCodes = ["ช", "บ", "ด", "ชบ", "บด", "D", "N", "x", "L", "V"];
-    const set = new Set<string>();
-    defaultCodes.forEach(c => set.add(c));
-    if (roster?.shifts) {
-      for (const s of roster.shifts) {
-        const clean = s.code?.trim();
-        if (clean && clean !== "X" && clean !== "?" && clean !== "??" && clean !== "???") {
-          set.add(clean);
-        }
-      }
-    }
-    const order = ["ช", "บ", "ด", "ชบ", "บด", "D", "N", "x", "L", "V"];
-    const list = Array.from(set);
-    list.sort((a, b) => {
-      const idxA = order.indexOf(a);
-      const idxB = order.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-    });
-    return list;
-  }, [roster?.shifts]);
+  const shiftOptions = useMemo(() => getShiftOptions(roster?.shifts || []), [roster?.shifts]);
+  const availablePaletteShifts = shiftOptions.map(shift => shift.code);
 
   async function signIn() {
     const candidate = tokenDraft.trim();
@@ -837,11 +816,11 @@ const holidaySet = new Set<string>();
           )}
 
           {(activeWorkspace === "schedule" || activeWorkspace === "review") && roster && <div className="nf-schedule-tools">
-            <div className="nf-toolbar"><div className="nf-palette" role="group" aria-label="เลือกประเภทเวร"><strong>เลือกประเภทเวร</strong>{availablePaletteShifts.map((code, codeIdx) => <button key={`${code}_${codeIdx}`} type="button" disabled={!canEdit || busy || saving} title={roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name || code} aria-pressed={brushMode && activeBrush === code} className={`nf-shift-choice ${brushMode && activeBrush === code ? "is-selected" : ""}`} onClick={() => {setActiveBrush(code); setBrushMode(true); setActiveCell(null);}}><ShiftBadge shiftCode={code} size="sm"/><span>{roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name.split(" (")[0] || code}</span></button>)}
+            <div className="nf-toolbar"><div className="nf-palette" role="group" aria-label="เลือกประเภทเวร"><button type="button" className="nf-button" disabled={!canEdit} aria-pressed={brushMode} onClick={() => {setBrushMode(!brushMode); setActiveCell(null);}}> {brushMode ? "ออกจากโหมดลงหลายช่อง" : "ลงเวรหลายช่อง"}</button>{availablePaletteShifts.map((code, codeIdx) => <button key={`${code}_${codeIdx}`} type="button" disabled={!canEdit || busy || saving} title={roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name || code} aria-pressed={brushMode && activeBrush === code} className={`nf-shift-choice ${brushMode && activeBrush === code ? "is-selected" : ""}`} onClick={() => {setActiveBrush(code); setBrushMode(true); setActiveCell(null);}}><ShiftBadge shiftCode={code} size="sm"/><span>{roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name.split(" (")[0] || code}</span></button>)}
               <button disabled={!canEdit || busy || saving} className={`nf-button ${brushMode && activeBrush === "" ? "is-selected" : ""}`} aria-pressed={brushMode && activeBrush === ""} onClick={() => {setActiveBrush(""); setBrushMode(true);}}><BackspaceIcon/>ล้างเวร</button>
               {brushMode && <button className="nf-icon-button" title="หยุดแต้มเวร" aria-label="หยุดแต้มเวร" onClick={() => setBrushMode(false)}><XMarkIcon/></button>}
-            </div><div className="flex gap-2 items-center"><button type="button" onClick={() => openWorkspace("compensation")} disabled={!roster} className="nf-button text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 font-bold transition shadow-xs" title="ตั้งค่าวันทำการ & เรทค่าเวร บด / ค่า OT ประจำเดือน"><BanknotesIcon className="w-4 h-4 text-emerald-600"/><span>💰 ค่าตอบแทน & OT</span></button><button type="button" onClick={() => setStrictOtGuard(!strictOtGuard)} className={`nf-button text-xs font-bold transition ${strictOtGuard ? "bg-purple-100 text-purple-900 border-purple-300 font-black" : "text-slate-700"}`} title={strictOtGuard ? "โหมดคุม OT เข้มงวด: ห้ามจัดเวรเกินโควตาเด็ดขาด" : "โหมดเตือน OT: เตือนยืนยันก่อนจัดเกินโควตา"}><span>{strictOtGuard ? "🛡️ คุม OT: เข้มงวด" : "🛡️ คุม OT: เตือนก่อนจัดเกิน"}</span></button><button className="nf-button text-teal-700" disabled={!roster} onClick={() => openWorkspace("boundary")}><CalendarDaysIcon/>เวรวันก่อนหน้า</button><button className="nf-button text-blue-700 font-bold" disabled={!canEdit || busy || saving} onClick={() => openWorkspace("solver")}><SparklesIcon/>จัดเวร AI</button><button className="nf-button nf-button-warning" aria-expanded={showRightPanel} onClick={() => setShowRightPanel(true)}><ExclamationTriangleIcon/>ปัญหา {violations.length}</button></div></div>
-            <div className="nf-hint"><InformationCircleIcon/>{!canEdit ? "โหมดดูอย่างเดียว — ตารางนี้ไม่อยู่ในสถานะที่แก้ไขได้ หรือบัญชีนี้ไม่มีสิทธิ์แก้ไข" : brushMode ? activeBrush ? `กำลังแต้มเวร ${roster.shifts.find(shift => shift.code === activeBrush)?.name || SHIFT_CONFIGS[activeBrush]?.name || activeBrush} — คลิกช่องวันที่เพื่อบันทึก` : "โหมดล้างเวร — คลิกช่องวันที่ที่ต้องการล้าง" : "เลือกประเภทเวร แล้วคลิกช่องวันที่ หรือคลิกช่องเพื่อดูตัวเลือกและล็อกเวร"}</div>
+            </div><div className="flex flex-wrap gap-2 items-center"><details><summary className="nf-button cursor-pointer">ตัวเลือกเพิ่มเติม</summary><button type="button" onClick={() => openWorkspace("compensation")} disabled={!roster} className="nf-button text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-300 font-bold transition shadow-xs" title="ตั้งค่าวันทำการ & เรทค่าเวร บด / ค่า OT ประจำเดือน"><BanknotesIcon className="w-4 h-4 text-emerald-600"/><span>💰 ค่าตอบแทน & OT</span></button><button type="button" onClick={() => setStrictOtGuard(!strictOtGuard)} className={`nf-button text-xs font-bold transition ${strictOtGuard ? "bg-purple-100 text-purple-900 border-purple-300 font-black" : "text-slate-700"}`} title={strictOtGuard ? "โหมดคุม OT เข้มงวด: ห้ามจัดเวรเกินโควตาเด็ดขาด" : "โหมดเตือน OT: เตือนยืนยันก่อนจัดเกินโควตา"}><span>{strictOtGuard ? "🛡️ คุม OT: เข้มงวด" : "🛡️ คุม OT: เตือนก่อนจัดเกิน"}</span></button><button className="nf-button text-teal-700" disabled={!roster} onClick={() => openWorkspace("boundary")}><CalendarDaysIcon/>เวรวันก่อนหน้า</button></details><button className="nf-button text-blue-700 font-bold" disabled={!canEdit || busy || saving} onClick={() => openWorkspace("solver")}><SparklesIcon/>จัดเวร AI</button><button className="nf-button nf-button-warning" aria-expanded={showRightPanel} onClick={() => setShowRightPanel(true)}><ExclamationTriangleIcon/>ปัญหา {violations.length}</button></div></div>
+            <div className="nf-hint"><InformationCircleIcon/>{!canEdit ? "โหมดดูอย่างเดียว — ตารางนี้ไม่อยู่ในสถานะที่แก้ไขได้ หรือบัญชีนี้ไม่มีสิทธิ์แก้ไข" : brushMode ? activeBrush ? `กำลังแต้มเวร ${roster.shifts.find(shift => shift.code === activeBrush)?.name || SHIFT_CONFIGS[activeBrush]?.name || activeBrush} — คลิกช่องวันที่เพื่อบันทึก` : "โหมดล้างเวร — คลิกช่องวันที่ที่ต้องการล้าง" : "คลิกช่องวันที่เพื่อเลือกเวร หากต้องการลงเวรต่อเนื่อง ให้เปิดโหมดลงเวรหลายช่อง"}</div>
           </div>}
           {activeWorkspace === "approval" && (
             <section className="approval-panel" aria-labelledby="approval-title">
@@ -1617,6 +1596,8 @@ const holidaySet = new Set<string>();
       {/* QUICK FLOATING SHIFT PICKER */}
       {activeCell && canEdit && (
         <QuickShiftPicker
+          nurseName={roster?.staff.find(n => n.id === activeCell.cell.nurseId)?.name}
+          shiftOptions={shiftOptions}
           currentShift={activeCell.cell.shiftCode}
           isLocked={activeCell.cell.locked}
           position={{

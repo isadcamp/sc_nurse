@@ -1,9 +1,12 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { XMarkIcon, LockClosedIcon, LockOpenIcon, BackspaceIcon } from "@heroicons/react/24/outline";
+import { shiftFamily } from "./shiftOptions";
 import { ShiftBadge, SHIFT_CONFIGS } from "./ShiftBadge";
 
 interface QuickShiftPickerProps {
+  nurseName?: string;
+  shiftOptions?: {code: string; name: string; periods: {start: number; end: number}[]}[];
   currentShift: string;
   isLocked: boolean;
   canLock?: boolean;
@@ -16,6 +19,8 @@ interface QuickShiftPickerProps {
   onClose: () => void;
 }
 export function QuickShiftPicker({
+  nurseName,
+  shiftOptions,
   currentShift,
   isLocked,
   canLock = true,
@@ -53,7 +58,7 @@ export function QuickShiftPicker({
       ref={ref}
       role="dialog"
       aria-label="เลือกเวร"
-      className="nf-shift-picker min-w-[240px] shadow-2xl z-50"
+      className="nf-shift-picker w-[min(360px,calc(100vw-16px))] max-h-[calc(100dvh-16px)] overflow-y-auto shadow-2xl z-50"
       style={{ top: position.top, left: position.left }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -62,22 +67,23 @@ export function QuickShiftPicker({
           return;
         }
         const shortcut: Record<string, string> = { "1": "ช", "2": "บ", "3": "ด", "0": codes.includes("x") ? "x" : codes.includes("X") ? "X" : "อ", l: "L", L: "L", v: "V", V: "V", d: "D", n: "N" };
-        if (!isLocked && shortcut[event.key] && codes.includes(shortcut[event.key])) {
+        const selectedCode = codes.find(code => shiftFamily(code) === shortcut[event.key]);
+        if (!isLocked && selectedCode) {
           event.preventDefault();
-          onSelectShift(shortcut[event.key]);
+          onSelectShift(selectedCode);
         }
       }}
     >
       <div className="flex items-center justify-between border-b border-slate-100 pb-2">
         <div>
-          <strong className="text-sm text-slate-800">เลือกเวร</strong>
+          <strong className="text-sm text-slate-800">เลือกเวร {nurseName}</strong>
           {date && <span className="ml-2 text-xs font-semibold text-slate-500">{date}</span>}
         </div>
         <button className="nf-icon-button" aria-label="ปิดตัวเลือกเวร" onClick={onClose}>
           <XMarkIcon />
         </button>
       </div>
-      <div className="grid grid-cols-4 gap-2 py-3">
+      <div className="grid grid-cols-3 gap-2 py-3">
         {Array.from(new Set(codes.filter(c => Boolean(c && c !== "?" && c !== "??" && c !== "???")))).map((code, cIdx) => {
           const wasCovering = (periodKey: string) => {
             if (periodKey === "morning") return currentShift === "ช" || currentShift === "Day" || currentShift === "D" || currentShift === "ชบ";
@@ -134,6 +140,8 @@ export function QuickShiftPicker({
               }}
             >
               <ShiftBadge shiftCode={code} />
+              <span className="mt-1 text-sm">{shiftOptions?.find(s => s.code === code)?.name || SHIFT_CONFIGS[code]?.name.split(" (")[0] || code}</span>
+              {shiftOptions && shiftOptions.filter(s => shiftFamily(s.code) === shiftFamily(code)).length > 1 && <span className="text-xs">{shiftOptions.find(s => s.code === code)?.periods.map(p => `${Math.floor(p.start / 60) % 24}:${String(p.start % 60).padStart(2, "0")}–${Math.floor(p.end / 60) % 24}:${String(p.end % 60).padStart(2, "0")}`).join(", ")}</span>}
               {quota && quota.target > 0 && (
                 <div
                   className={`mt-1 text-[9px] font-bold px-1 rounded leading-tight ${
