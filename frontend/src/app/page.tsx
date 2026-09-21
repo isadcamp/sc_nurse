@@ -57,8 +57,8 @@ export default function Home() {
   // Views & Panels
   const [activeTab, setActiveTab] = useState<"grid" | "dashboard" | "ai" | "solver" | "policy">("grid");
   const [activeWorkspace, setActiveWorkspace] = useState<
-    "preflight" | "schedule" | "solver" | "policy" | "review" | "overview" | "proposals" | "approval" | "staff" | "departments" | "holidays" | "boundary" | "compensation" | "leave" | "users"
-  >("schedule");
+    "home" | "preflight" | "schedule" | "solver" | "policy" | "review" | "overview" | "proposals" | "approval" | "staff" | "departments" | "holidays" | "boundary" | "compensation" | "leave" | "users"
+  >("home");
   const [violationFilter, setViolationFilter] = useState<"all" | "error" | "warning">("all");
   const [violationQuery, setViolationQuery] = useState("");
   const [showWardModal, setShowWardModal] = useState(false);
@@ -168,6 +168,7 @@ export default function Home() {
   }
 
   function signOut() {
+    openWorkspace("home");
     setToken(""); setActor(null); setData(null); setWards([]); setVersions([]); setActiveCell(null);
     setShowWardModal(false); setShowDepartmentModal(false); setShowUserModal(false); setShowStaffModal(false);
     setShowHolidayModal(false); setShowLeaveModal(false); setShowPrintModal(false);
@@ -525,7 +526,7 @@ const currentWardObj = wards.find((w) => w.id === ward);
     { key: "approved", label: "อนุมัติ" },
     { key: "published", label: "ประกาศ" },
   ];
-  const workflowPosition = activeWorkspace === "preflight" ? 0 : activeWorkspace === "solver" ? 1 : activeWorkspace === "review" ? 3 : activeWorkspace === "approval" ? (roster?.status === "published" ? 5 : 4) : 2;
+  const workflowPosition = activeWorkspace === "home" ? -1 : activeWorkspace === "preflight" ? 0 : activeWorkspace === "solver" ? 1 : activeWorkspace === "review" ? 3 : activeWorkspace === "approval" ? (roster?.status === "published" ? 5 : 4) : 2;
   function openWorkspace(workspace: typeof activeWorkspace) {
     setActiveWorkspace(workspace);
     setActiveTab(
@@ -695,6 +696,7 @@ const holidaySet = new Set<string>();
           <div className="nf-brand"><BuildingOffice2Icon aria-hidden="true" /><div className="nav-label"><strong>NurseFlow <span>2.0</span></strong><p>ระบบบริหารและจัดตารางเวร</p></div></div>
           <nav className="nf-menu" aria-label="พื้นที่ทำงาน">
             {[
+              {label:"หน้าแรก / งานถัดไป", icon:ClipboardDocumentCheckIcon, key:"home" as const},
               {label:"เตรียมข้อมูล", icon:ClipboardDocumentCheckIcon, key:"preflight" as const},
               {label:"จัดเวร AI", icon:SparklesIcon, key:"solver" as const},
               {label:"จัดตารางเวร", icon:CalendarDaysIcon, key:"schedule" as const},
@@ -719,6 +721,7 @@ const holidaySet = new Set<string>();
         <div className="flex items-center gap-3 min-w-0">
           <button className="nf-icon-button" onClick={() => setShowLeftPanel(!showLeftPanel)} aria-label="เปิด/ปิดเมนูหลัก" aria-expanded={showLeftPanel}><Bars3Icon/></button>
           <div><h1>{
+            activeWorkspace === "home" ? "งานจัดตารางเวรของคุณ" :
             activeWorkspace === "overview" ? "ภาพรวมตารางเวร" :
             activeWorkspace === "proposals" ? "ข้อเสนอการจัดเวร" :
             activeWorkspace === "approval" ? "อนุมัติและประกาศ" :
@@ -784,6 +787,55 @@ const holidaySet = new Set<string>();
 
       <div className="nf-workspace">
         <main className="min-w-0" aria-busy={busy || saving}>
+          {activeWorkspace === "home" && (
+            <section className="space-y-5 p-4 sm:p-6" aria-labelledby="work-home-title">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:p-7">
+                <p className="text-sm text-blue-800">{currentWardName} · {month}</p>
+                <h2 id="work-home-title" className="mt-2 text-xl font-bold text-slate-900">{roster ? "งานที่ต้องทำต่อ" : "เริ่มจากเลือกหน่วยงานและเดือน"}</h2>
+                <p className="mt-2 text-sm text-slate-700">{roster ? `กำลังเปิดตาราง #${roster.id} · v${roster.version} — ${currentStatus.label}` : "เปิดตารางเดือนนี้เพื่อค้นหางานเดิม หากยังไม่มีตาราง ให้เตรียมข้อมูลก่อนสร้างตารางใหม่"}</p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {!roster ? <>
+                    <button className="nf-button nf-button-primary" disabled={busy || !month || !ward} onClick={() => void load()}>เปิดตารางเดือนนี้</button>
+                    {isHead && <button className="nf-button" onClick={() => openWorkspace("preflight")}>เตรียมข้อมูลก่อนจัดเวร</button>}
+                  </> : <>
+                    <button className="nf-button nf-button-primary" disabled={busy} onClick={() => openWorkspace(!isHead || roster.status === "published" || roster.status === "closed" ? "schedule" : criticalViolations.length ? "review" : !roster.assignments.length ? "solver" : "approval")}>
+                      {!isHead ? "ดูตารางเวร" : roster.status === "published" ? "ดูตารางที่ประกาศใช้" : roster.status === "closed" ? "ดูตารางที่ปิดงวด" : criticalViolations.length ? `ดูจุดที่ต้องแก้ไข ${criticalViolations.length} จุด` : !roster.assignments.length ? "เริ่มจัดตารางเวร" : roster.status === "under_review" ? "ตรวจเพื่ออนุมัติ" : roster.status === "approved" ? "ไปประกาศใช้ตาราง" : "ตรวจและส่งอนุมัติ"}
+                    </button>
+                    {canEdit && <button className="nf-button" onClick={() => openWorkspace("schedule")}>จัดตารางต่อ</button>}
+                  </>}
+                </div>
+              </div>
+              {roster && <div className="grid gap-4 sm:grid-cols-2">
+                <article className="rounded-xl border border-slate-200 bg-white p-5">
+                  <h3 className="font-bold">ผลตรวจตารางที่เปิดอยู่</h3>
+                  <p className="mt-2 font-semibold">{!data?.report ? "ยังไม่มีผลตรวจ" : criticalViolations.length ? `ต้องแก้ไข ${criticalViolations.length} จุด` : "ผ่านการตรวจข้อบังคับ"}</p>
+                  {data?.report && <p className="mt-1 text-sm text-slate-600">ข้อควรตรวจสอบเพิ่มเติม {violations.length - criticalViolations.length} รายการ</p>}
+                  <button className="nf-button mt-3" onClick={() => openWorkspace("review")}>ดูรายละเอียดผลตรวจ</button>
+                </article>
+                <article className="rounded-xl border border-slate-200 bg-white p-5">
+                  <h3 className="font-bold">สถานะการนำไปใช้</h3>
+                  <p className="mt-2 font-semibold">{roster.status === "published" ? "ประกาศใช้แล้ว" : roster.status === "closed" ? "ปิดงวดแล้ว" : "ยังไม่ประกาศใช้"}</p>
+                  <p className="mt-1 text-sm text-slate-600">{roster.status === "published" ? "ฉบับนี้ผ่านขั้นตอนประกาศใช้งานแล้ว" : roster.status === "closed" ? "ใช้ดูข้อมูลย้อนหลังของงวดที่ปิดแล้ว" : "แม้ผ่านผลตรวจแล้ว ยังต้องอนุมัติและประกาศก่อนนำไปใช้"}</p>
+                </article>
+              </div>}
+              <section className="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="version-list-title">
+                <h3 id="version-list-title" className="font-bold">ตารางแต่ละฉบับในเดือนที่เลือก</h3>
+                <p className="mt-1 text-sm text-slate-600">แสดงฉบับที่ประกาศใช้ก่อน เลือกเปิดฉบับเพื่อดูผลตรวจล่าสุด</p>
+                {!versions.length ? <p className="mt-4 text-sm text-slate-600">ยังไม่มีรายการให้แสดง กรุณาเปิดตารางเดือนนี้ก่อน หากไม่พบตาราง ให้เริ่มที่เตรียมข้อมูล</p> : <ul className="mt-4 space-y-3">
+                  {[...versions].sort((a, b) => Number(b.status === "published") - Number(a.status === "published") || b.id - a.id).map(version => <li key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
+                    <div>
+                      <p className="font-semibold">ตาราง #{version.id} · v{version.version}{version.id === roster?.id ? " · กำลังเปิดอยู่" : ""}</p>
+                      <p className="mt-1 text-sm">{statusConfig[version.status]?.label ?? version.status} · {version.status === "published" ? "ประกาศใช้แล้ว" : version.status === "closed" ? "ข้อมูลย้อนหลัง" : "ยังไม่ประกาศใช้"}</p>
+                      <p className="mt-1 text-xs text-slate-600">{version.id === roster?.id && data?.report ? criticalViolations.length ? `ผลตรวจ: ต้องแก้ไข ${criticalViolations.length} จุด` : "ผลตรวจ: ผ่านข้อบังคับ" : "เปิดฉบับนี้เพื่อดูผลตรวจ"}</p>
+                    </div>
+                    <button className="nf-button" disabled={busy} onClick={() => void loadScheduleById(version.id)}>เปิดฉบับ #{version.id}</button>
+                  </li>)}
+                </ul>}
+              </section>
+              <p className="text-sm text-slate-600">ลำดับงาน: เตรียมข้อมูล → จัดตาราง → ตรวจข้อผิดพลาด → ส่งอนุมัติ → ประกาศใช้</p>
+            </section>
+          )}
+
           {(activeWorkspace === "schedule" || activeWorkspace === "review") && roster && <div className="nf-schedule-tools">
             <div className="nf-toolbar"><div className="nf-palette" role="group" aria-label="เลือกประเภทเวร"><strong>เลือกประเภทเวร</strong>{availablePaletteShifts.map((code, codeIdx) => <button key={`${code}_${codeIdx}`} type="button" disabled={!canEdit || busy || saving} title={roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name || code} aria-pressed={brushMode && activeBrush === code} className={`nf-shift-choice ${brushMode && activeBrush === code ? "is-selected" : ""}`} onClick={() => {setActiveBrush(code); setBrushMode(true); setActiveCell(null);}}><ShiftBadge shiftCode={code} size="sm"/><span>{roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name.split(" (")[0] || code}</span></button>)}
               <button disabled={!canEdit || busy || saving} className={`nf-button ${brushMode && activeBrush === "" ? "is-selected" : ""}`} aria-pressed={brushMode && activeBrush === ""} onClick={() => {setActiveBrush(""); setBrushMode(true);}}><BackspaceIcon/>ล้างเวร</button>
