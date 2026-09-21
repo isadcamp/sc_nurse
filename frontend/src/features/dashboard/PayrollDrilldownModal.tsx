@@ -43,7 +43,8 @@ export function PayrollDrilldownModal({
   const comp = roster?.policy?.compensation || {};
   const isPN = nurse?.position?.toUpperCase() === "PN";
   const eveRate = isPN ? (comp.pnEveNightRate ?? 180) : (comp.rnEveNightRate ?? 240);
-  const otRate = isPN ? (comp.pnOtRate ?? 600) : (comp.rnOtRate ?? 800);
+  const rawOtRate = isPN ? (comp.pnOtRate ?? 75) : (comp.rnOtRate ?? 100);
+  const otHourlyRate = rawOtRate > 250 ? Math.round(rawOtRate / 8) : rawOtRate;
   const allowanceCap = comp.allowanceCap ?? 0;
   const workingDays = comp.workingDays && comp.workingDays > 0 ? comp.workingDays : 22;
 
@@ -179,7 +180,7 @@ export function PayrollDrilldownModal({
     const excessUnits = allowanceCap > 0 ? Math.max(0, totalEveNightUnits - allowanceCap) : 0;
 
     const totalEveNightPay = payableUnits * eveRate;
-    const totalOtPay = otShifts * otRate;
+    const totalOtPay = otHours * otHourlyRate;
     const grandTotalPay = totalEveNightPay + totalOtPay;
 
     return {
@@ -204,7 +205,7 @@ export function PayrollDrilldownModal({
       leaveCount,
       rows,
     };
-  }, [nurse, roster, eveRate, otRate, allowanceCap, workingDays]);
+  }, [nurse, roster, eveRate, otHourlyRate, allowanceCap, workingDays]);
 
   if (!isOpen || !nurse || !statement) return null;
 
@@ -271,12 +272,12 @@ export function PayrollDrilldownModal({
           </div>
 
           <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200">
-            <div className="text-[11px] font-semibold text-purple-700">เวรล่วงเวลา (OT)</div>
+            <div className="text-[11px] font-semibold text-purple-700">ชั่วโมงล่วงเวลา (OT)</div>
             <div className="text-lg font-black text-purple-900 mt-0.5">
-              {statement.otShifts} <span className="text-xs font-normal text-purple-700">เวร ({statement.otHours} ชม.)</span>
+              {statement.otHours} <span className="text-xs font-normal text-purple-700">ชม. ({statement.otShifts.toFixed(2)} เวร)</span>
             </div>
             <div className="text-[10px] text-purple-600 mt-0.5">
-              เกณฑ์ {statement.standardHours} ชม. ({statement.variance > 0 ? `+${statement.otHours} ชม.` : statement.variance < 0 ? `ขาด ${statement.shortageHours} ชม.` : "พอดี"})
+              อัตรา @ {otHourlyRate} ฿/ชม. = {statement.totalOtPay.toLocaleString()} ฿
             </div>
           </div>
 
@@ -309,7 +310,7 @@ export function PayrollDrilldownModal({
               ตารางแจกแจงรายวัน (Daily Itemized Statement)
             </span>
             <span className="text-[11px] text-slate-500 font-medium">
-              อัตราค่าตอบแทน: {nurse.position || "RN"} (บ่ายดึก {eveRate} ฿ | OT {otRate} ฿/เวร)
+              อัตราค่าตอบแทน: {nurse.position || "RN"} (บ่ายดึก {eveRate} ฿/หน่วย | OT {otHourlyRate} ฿/ชม.)
             </span>
           </div>
 
@@ -376,7 +377,7 @@ export function PayrollDrilldownModal({
           </div>
           <p className="text-[11px] leading-relaxed">
             รายการคำนวณนี้ออกโดยระบบ <strong>NurseFlow Payroll Engine</strong> คำนวณตามระเบียบโรงพยาบาล:
-            ฐานทำงาน {workingDays} วันทำการ ({statement.standardHours} ชม.), อัตราค่าเวรบ่ายดึก {eveRate} ฿/หน่วย (เพดาน {allowanceCap > 0 ? `${allowanceCap} วัน` : "ไม่จำกัด"}), และอัตรา OT {otRate} ฿/เวร 8 ชม.
+            ฐานทำงาน {workingDays} วันทำการ ({statement.standardHours} ชม.), อัตราค่าเวรบ่ายดึก {eveRate} ฿/หน่วย (เพดาน {allowanceCap > 0 ? `${allowanceCap} วัน` : "ไม่จำกัด"}), และอัตราค่าล่วงเวลา OT {otHourlyRate} ฿/ชม. (~{(otHourlyRate * 8).toLocaleString()} ฿/เวร 8 ชม.)
           </p>
         </div>
 

@@ -45,12 +45,22 @@ export function CompensationPanel({
     return count > 0 ? count : 22;
   };
 
+  const initRnOtRate = () => {
+    if (!comp.rnOtRate) return 100;
+    return comp.rnOtRate > 250 ? Math.round(comp.rnOtRate / 8) : comp.rnOtRate;
+  };
+
+  const initPnOtRate = () => {
+    if (!comp.pnOtRate) return 75;
+    return comp.pnOtRate > 250 ? Math.round(comp.pnOtRate / 8) : comp.pnOtRate;
+  };
+
   const [workingDays, setWorkingDays] = useState<number>(defaultWorkingDays);
   const [allowanceCap, setAllowanceCap] = useState<number>(comp.allowanceCap ?? 0);
   const [rnEveNightRate, setRnEveNightRate] = useState<number>(comp.rnEveNightRate ?? 240);
   const [pnEveNightRate, setPnEveNightRate] = useState<number>(comp.pnEveNightRate ?? 180);
-  const [rnOtRate, setRnOtRate] = useState<number>(comp.rnOtRate ?? 800);
-  const [pnOtRate, setPnOtRate] = useState<number>(comp.pnOtRate ?? 600);
+  const [rnOtRate, setRnOtRate] = useState<number>(initRnOtRate);
+  const [pnOtRate, setPnOtRate] = useState<number>(initPnOtRate);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -304,21 +314,42 @@ export function CompensationPanel({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between bg-white p-3.5 rounded-xl border border-blue-200">
-                <div>
-                  <div className="text-xs font-bold text-slate-800">ค่าเวรล่วงเวลา (OT)</div>
-                  <div className="text-[10px] text-slate-500">Overtime pay per 8h shift</div>
+              <div className="bg-white p-3.5 rounded-xl border border-blue-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">ค่าเวรล่วงเวลา (OT ต่อชั่วโมง)</div>
+                    <div className="text-[10px] text-slate-500">Overtime pay rate per hour</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={rnOtRate}
+                      onChange={(e) => setRnOtRate(Number(e.target.value))}
+                      className="w-24 px-3 py-1.5 text-xs font-black text-right text-slate-800 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    />
+                    <span className="text-xs text-blue-700 font-bold">฿ / ชม.</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={rnOtRate}
-                    onChange={(e) => setRnOtRate(Number(e.target.value))}
-                    className="w-24 px-3 py-1.5 text-xs font-black text-right text-slate-800 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                  <span className="text-xs text-slate-600 font-bold">฿ / เวร</span>
+                <div className="flex items-center justify-between text-[10px] text-blue-700 pt-1 border-t border-slate-100">
+                  <span>~{(rnOtRate * 8).toLocaleString()} บาท/เวร (8 ชม.)</span>
+                  <div className="flex items-center gap-1">
+                    {[80, 100, 120, 150].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRnOtRate(r)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded border font-semibold cursor-pointer ${
+                          rnOtRate === r
+                            ? "bg-blue-600 text-white border-blue-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-blue-50"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -352,25 +383,62 @@ export function CompensationPanel({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between bg-white p-3.5 rounded-xl border border-emerald-200">
-                <div>
-                  <div className="text-xs font-bold text-slate-800">ค่าเวรล่วงเวลา (OT)</div>
-                  <div className="text-[10px] text-slate-500">Overtime pay per 8h shift</div>
+              <div className="bg-white p-3.5 rounded-xl border border-emerald-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-slate-800">ค่าเวรล่วงเวลา (OT ต่อชั่วโมง)</div>
+                    <div className="text-[10px] text-slate-500">Overtime pay rate per hour</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={pnOtRate}
+                      onChange={(e) => setPnOtRate(Number(e.target.value))}
+                      className="w-24 px-3 py-1.5 text-xs font-black text-right text-slate-800 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <span className="text-xs text-emerald-700 font-bold">฿ / ชม.</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={pnOtRate}
-                    onChange={(e) => setPnOtRate(Number(e.target.value))}
-                    className="w-24 px-3 py-1.5 text-xs font-black text-right text-slate-800 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"
-                  />
-                  <span className="text-xs text-slate-600 font-bold">฿ / เวร</span>
+                <div className="flex items-center justify-between text-[10px] text-emerald-700 pt-1 border-t border-slate-100">
+                  <span>~{(pnOtRate * 8).toLocaleString()} บาท/เวร (8 ชม.)</span>
+                  <div className="flex items-center gap-1">
+                    {[60, 75, 90, 100].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setPnOtRate(r)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded border font-semibold cursor-pointer ${
+                          pnOtRate === r
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* 4. Formula Explanation Box */}
+      <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl text-xs space-y-2 text-amber-950">
+        <div className="flex items-center gap-1.5 font-bold">
+          <InformationCircleIcon className="w-4 h-4 text-amber-600" />
+          <span>สูตรการคำนวณค่าเวร & ค่าล่วงเวลา (OT):</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-amber-800 pl-1">
+          <div>• <strong>ค่าเวร:</strong> บ/ด × ค่าเวรบ่าย-ดึก (บ/ด) (แยกตาม RN, PN)</div>
+          <div>• <strong>OT (เวร):</strong> (ช + บ + ด) - (จำนวนวันทำการ)</div>
+          <div>• <strong>เงิน OT:</strong> OT × 8 × ค่าเวรล่วงเวลา (OT ต่อชั่วโมง) (แยกตาม RN, PN)</div>
+          <div>• <strong>รวมเงินสุทธิ:</strong> ค่าเวร (บ/ด) + เงิน OT</div>
+          <div>• <strong>การนับหน่วย บ/ด:</strong> บ (1.0), ด (1.0), Day 12h (0.5), Night 12h (1.5), ชบ (1.0), บด (2.0)</div>
+          <div>• <strong>เพดานสิทธิเบิก:</strong> {allowanceCap > 0 ? `จำกัดสิทธิเบิกค่าเวรสูงสุดไม่เกิน ${allowanceCap} หน่วย/เดือน` : "เบิกได้ตามจริงไม่จำกัดเพดาน"}</div>
         </div>
       </div>
 

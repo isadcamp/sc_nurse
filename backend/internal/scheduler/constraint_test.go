@@ -1142,6 +1142,67 @@ func TestPruneExcessNight_Target3_FourToThree(t *testing.T) {
 	t.Logf("Target=3 Night Cap result: 4 nurses pruned to %.1f (exactly target 3.0, leader PRESERVED)", nightScore)
 }
 
+// TestNightDeficitRelief_EveningToNightWhenNextDayIsOff verifies that when Night staffing is under-covered,
+// a nurse on Evening ('บ') whose next day is OFF/Leave ('X') is safely converted to 12h Night ('N').
+func TestNightDeficitRelief_EveningToNightWhenNextDayIsOff(t *testing.T) {
+	r := domain.Roster{
+		Policy: domain.Policy{
+			Staffing: []domain.Staffing{
+				{Date: "2026-10-05", Start: 480, End: 960, RN: 2, Leaders: 1},
+				{Date: "2026-10-05", Start: 960, End: 1440, RN: 1, Leaders: 0}, // Target = 1 RN (Evening has 2 RNs, allows 1 relief conversion)
+				{Date: "2026-10-05", Start: 0, End: 480, RN: 1, Leaders: 1}, // Target = 2 RNs (1 RN + 1 Leader)
+			},
+			MinRestHours: 8,
+		},
+		Staff: []domain.Staff{
+			{ID: "rn-lead", Active: true, Position: "RN", Leader: true, Allowed: []string{"ด", "X"}},
+			{ID: "rn-eve1", Active: true, Position: "RN", Allowed: []string{"บ", "N", "X"}},
+			{ID: "rn-eve2", Active: true, Position: "RN", Allowed: []string{"บ", "N", "X"}},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "ช", Periods: []domain.Period{{Start: 480, End: 960}}},
+			{Code: "บ", Periods: []domain.Period{{Start: 960, End: 1440}}},
+			{Code: "ด", Periods: []domain.Period{{Start: 0, End: 480}}},
+			{Code: "N", Periods: []domain.Period{{Start: 1200, End: 1920}}},
+			{Code: "X", Periods: []domain.Period{}},
+		},
+	}
+
+	dateD := "2026-10-05"
+	dateDNext := "2026-10-06"
+	cells := []domain.Cell{
+		// Day D: Only 1 Night RN (rn-lead), deficit = 1
+		{NurseID: "rn-lead", Date: dateD, ShiftCode: "ด"},
+		{NurseID: "rn-eve1", Date: dateD, ShiftCode: "บ"},
+		{NurseID: "rn-eve2", Date: dateD, ShiftCode: "บ"},
+
+		// Day D+1: rn-eve1 is OFF (X), rn-eve2 works Morning (ช)
+		{NurseID: "rn-lead", Date: dateDNext, ShiftCode: "X"},
+		{NurseID: "rn-eve1", Date: dateDNext, ShiftCode: "X"},
+		{NurseID: "rn-eve2", Date: dateDNext, ShiftCode: "ช"},
+	}
+
+	pruned := pruneExcessDoubles(r, cells)
+
+	shiftMapRes := map[string]string{}
+	for _, c := range pruned {
+		shiftMapRes[c.NurseID+"@"+c.Date] = c.ShiftCode
+	}
+
+	// rn-eve1 should be converted to "N" because next day is "X"
+	if shiftMapRes["rn-eve1@2026-10-05"] != "N" {
+		t.Errorf("expected rn-eve1 on 2026-10-05 to be converted from 'บ' to 'N', got '%s'", shiftMapRes["rn-eve1@2026-10-05"])
+	}
+
+	// rn-eve2 should NOT be converted to "N" because next day is "ช" (would violate rest constraint)
+	if shiftMapRes["rn-eve2@2026-10-05"] != "บ" {
+		t.Errorf("expected rn-eve2 on 2026-10-05 to remain 'บ' due to next day 'ช', got '%s'", shiftMapRes["rn-eve2@2026-10-05"])
+	}
+
+	t.Logf("Night Relief result: rn-eve1 converted to '%s', rn-eve2 safely remained '%s'",
+		shiftMapRes["rn-eve1@2026-10-05"], shiftMapRes["rn-eve2@2026-10-05"])
+}
+
 
 
 

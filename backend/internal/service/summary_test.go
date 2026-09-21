@@ -493,3 +493,103 @@ func TestComputeSummary_CarryOverNightStaffing(t *testing.T) {
 	}
 }
 
+func TestComputeSummary_HourlyOTRate(t *testing.T) {
+	roster := domain.Roster{
+		ID:       2,
+		WardID:   "ward-icu",
+		Month:    9,
+		Year:     2026,
+		Timezone: "Asia/Bangkok",
+		Staff: []domain.Staff{
+			{ID: "rn-hourly", Name: "RN Hourly", Position: "RN", Active: true},
+			{ID: "pn-hourly", Name: "PN Hourly", Position: "PN", Active: true},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "ช", Name: "เช้า", Periods: []domain.Period{{Start: 480, End: 960}}},
+			{Code: "บ", Name: "บ่าย", Periods: []domain.Period{{Start: 960, End: 1440}}},
+		},
+		Policy: domain.Policy{
+			MinRestHours:         8,
+			MaxConsecutiveDays:   6,
+			MaxConsecutiveNights: 3,
+			MaxMonthlyHours:      300,
+			MaxContinuousHours:   16,
+			NightStart:           1200,
+			NightEnd:             1920,
+			Compensation: domain.CompensationConfig{
+				WorkingDays:    20,  // Base = 20 * 8 = 160 hrs
+				RNEveNightRate: 240,
+				PNEveNightRate: 180,
+				RNOTRate:       120, // Explicit hourly rate: 120 ฿/hr
+				PNOTRate:       80,  // Explicit hourly rate: 80 ฿/hr
+			},
+		},
+		Assignments: []domain.Cell{},
+	}
+
+	// RN works 21 shifts (168 hours): 8 hours OT => 8 hrs * 120 ฿/hr = 960 ฿
+	// Plus 5 evening shifts => 5 * 240 = 1,200 ฿ => Total = 2,160 ฿
+	for i := 1; i <= 16; i++ {
+		roster.Assignments = append(roster.Assignments, domain.Cell{
+			NurseID:   "rn-hourly",
+			Date:      fmt.Sprintf("2026-09-%02d", i),
+			ShiftCode: "ช",
+		})
+	}
+	for i := 17; i <= 21; i++ {
+		roster.Assignments = append(roster.Assignments, domain.Cell{
+			NurseID:   "rn-hourly",
+			Date:      fmt.Sprintf("2026-09-%02d", i),
+			ShiftCode: "บ",
+		})
+	}
+
+	// PN works 22 shifts (176 hours): 16 hours OT => 16 hrs * 80 ฿/hr = 1,280 ฿
+	// Plus 2 evening shifts => 2 * 180 = 360 ฿ => Total = 1,640 ฿
+	for i := 1; i <= 20; i++ {
+		roster.Assignments = append(roster.Assignments, domain.Cell{
+			NurseID:   "pn-hourly",
+			Date:      fmt.Sprintf("2026-09-%02d", i),
+			ShiftCode: "ช",
+		})
+	}
+	for i := 21; i <= 22; i++ {
+		roster.Assignments = append(roster.Assignments, domain.Cell{
+			NurseID:   "pn-hourly",
+			Date:      fmt.Sprintf("2026-09-%02d", i),
+			ShiftCode: "บ",
+		})
+	}
+
+	summary := ComputeSummary(roster)
+	var rnStat, pnStat domain.NurseMonthStat
+	for _, ns := range summary.NurseStats {
+		if ns.NurseID == "rn-hourly" {
+			rnStat = ns
+		} else if ns.NurseID == "pn-hourly" {
+			pnStat = ns
+		}
+	}
+
+	if rnStat.OTHours != 8 {
+		t.Errorf("expected RN OTHours=8, got %f", rnStat.OTHours)
+	}
+	if rnStat.OTPay != 960 {
+		t.Errorf("expected RN OTPay=960 (8h * 120 ฿/hr), got %f", rnStat.OTPay)
+	}
+	if rnStat.TotalPay != 2160 {
+		t.Errorf("expected RN TotalPay=2160, got %f", rnStat.TotalPay)
+	}
+
+	if pnStat.OTHours != 16 {
+		t.Errorf("expected PN OTHours=16, got %f", pnStat.OTHours)
+	}
+	if pnStat.OTPay != 1280 {
+		t.Errorf("expected PN OTPay=1280 (16h * 80 ฿/hr), got %f", pnStat.OTPay)
+	}
+	if pnStat.TotalPay != 1640 {
+		t.Errorf("expected PN TotalPay=1640, got %f", pnStat.TotalPay)
+	}
+}
+
+

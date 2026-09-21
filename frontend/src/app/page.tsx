@@ -569,13 +569,15 @@ const holidaySet = new Set<string>();
   }
 
   const wardPayroll = useMemo(() => {
-    if (!roster) return { eveNightPay: 0, otPay: 0, totalPay: 0, otShifts: 0, eveNightShifts: 0 };
+    if (!roster) return { eveNightPay: 0, otPay: 0, totalPay: 0, otShifts: 0, otHours: 0, eveNightShifts: 0 };
     const comp = roster.policy?.compensation || {};
     const workingDays = comp.workingDays && comp.workingDays > 0 ? comp.workingDays : 22;
     const rnEveRate = comp.rnEveNightRate ?? 240;
     const pnEveRate = comp.pnEveNightRate ?? 180;
-    const rnOtRate = comp.rnOtRate ?? 800;
-    const pnOtRate = comp.pnOtRate ?? 600;
+    const rawRnOtRate = comp.rnOtRate ?? 100;
+    const rnOtHourlyRate = rawRnOtRate > 250 ? Math.round(rawRnOtRate / 8) : rawRnOtRate;
+    const rawPnOtRate = comp.pnOtRate ?? 75;
+    const pnOtHourlyRate = rawPnOtRate > 250 ? Math.round(rawPnOtRate / 8) : rawPnOtRate;
 
     const targetMap = new Map<string, number>();
     if (Array.isArray(roster.policy?.targets)) {
@@ -587,6 +589,7 @@ const holidaySet = new Set<string>();
     let totalEveNightPay = 0;
     let totalOtPay = 0;
     let totalOtShifts = 0;
+    let totalOtHours = 0;
     let totalEveNightShifts = 0;
 
     for (const nurse of roster.staff) {
@@ -624,12 +627,13 @@ const holidaySet = new Set<string>();
 
       const isPN = nurse.position?.toUpperCase() === "PN";
       const eveRate = isPN ? pnEveRate : rnEveRate;
-      const otRate = isPN ? pnOtRate : rnOtRate;
+      const otHourlyRate = isPN ? pnOtHourlyRate : rnOtHourlyRate;
 
       totalEveNightShifts += eveNight;
+      totalOtHours += otHours;
       totalOtShifts += otShifts;
       totalEveNightPay += eveNight * eveRate;
-      totalOtPay += otShifts * otRate;
+      totalOtPay += otHours * otHourlyRate;
     }
 
     return {
@@ -637,6 +641,7 @@ const holidaySet = new Set<string>();
       otPay: totalOtPay,
       totalPay: totalEveNightPay + totalOtPay,
       otShifts: totalOtShifts,
+      otHours: totalOtHours,
       eveNightShifts: totalEveNightShifts,
     };
   }, [roster]);
@@ -1176,7 +1181,7 @@ const holidaySet = new Set<string>();
                           <span>ค่า OT รวม: <strong className="text-purple-700">{wardPayroll.otShifts}</strong> เวร (<strong className="text-purple-700">{wardPayroll.otPay.toLocaleString()}</strong> ฿)</span>
                           <span className="text-slate-300">|</span>
                           <span className="text-[11px] text-slate-500">
-                            (RN: บด {roster.policy?.compensation?.rnEveNightRate ?? 240}฿ / OT {roster.policy?.compensation?.rnOtRate ?? 800}฿ | PN: บด {roster.policy?.compensation?.pnEveNightRate ?? 180}฿ / OT {roster.policy?.compensation?.pnOtRate ?? 600}฿)
+                            (RN: บด {roster.policy?.compensation?.rnEveNightRate ?? 240}฿ / OT {(roster.policy?.compensation?.rnOtRate && roster.policy.compensation.rnOtRate <= 250) ? roster.policy.compensation.rnOtRate : (roster.policy?.compensation?.rnOtRate ? Math.round(roster.policy.compensation.rnOtRate / 8) : 100)}฿/ชม | PN: บด {roster.policy?.compensation?.pnEveNightRate ?? 180}฿ / OT {(roster.policy?.compensation?.pnOtRate && roster.policy.compensation.pnOtRate <= 250) ? roster.policy.compensation.pnOtRate : (roster.policy?.compensation?.pnOtRate ? Math.round(roster.policy.compensation.pnOtRate / 8) : 75)}฿/ชม)
                           </span>
                         </div>
                       </div>

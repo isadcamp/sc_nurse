@@ -1827,6 +1827,21 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 	isEveningShiftCode := func(code string) bool {
 		return code == "บ" || code == "ชบ" || code == "บด"
 	}
+	isOffOrLeave := func(code string) bool {
+		c := strings.TrimSpace(code)
+		return c == "" || c == "X" || c == "x" || c == "L" || c == "V" || c == "v" || c == "Va" || c == "OFF" || c == "อ"
+	}
+	isNurseAllowedShift := func(nurse domain.Staff, code string) bool {
+		if len(nurse.Allowed) == 0 {
+			return true
+		}
+		for _, a := range nurse.Allowed {
+			if a == code || (code == "N" && (a == "Night" || a == "12N")) || (code == "Night" && (a == "N" || a == "12N")) {
+				return true
+			}
+		}
+		return false
+	}
 
 	isValidTransition := func(prevCode, nextCode string) bool {
 		if prevCode == "" || prevCode == "X" || prevCode == "x" || prevCode == "L" || prevCode == "OFF" || prevCode == "Va" || prevCode == "V" || prevCode == "v" {
@@ -1955,13 +1970,13 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 		eveReqPNFloat := float64(eveReqPN)
 		eveReqLeadersFloat := float64(eveReqLeaders)
 
-		// 1. Trim excess RNs in Evening: downgrade unlocked "ชบ" -> "ช" (or excess "บ" -> "X")
+		// 1. Trim excess RNs in Evening: downgrade unlocked "ชบ" -> "ช"
 		// As per hospital rule: If target is 4, allow 3.5 (do not exceed 4.0).
 		// Trim whenever currentEveRN > target (e.g. 4.5 -> 3.5 <= 4.0).
-		if currentEveRN > totalEveReqRNFloat + 0.001 {
+		if currentEveRN > totalEveReqRNFloat+0.001 {
 			// Pass 1: Non-leader RNs on "ชบ" -> "ช"
 			for _, idx := range indices {
-				if currentEveRN <= totalEveReqRNFloat + 0.001 {
+				if currentEveRN <= totalEveReqRNFloat+0.001 {
 					break
 				}
 				c := out[idx]
@@ -1978,7 +1993,7 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 
 			// Pass 2: Leader RNs on "ชบ" -> "ช" (only if remaining evening leaders >= eveReqLeaders)
 			for _, idx := range indices {
-				if currentEveRN <= totalEveReqRNFloat + 0.001 {
+				if currentEveRN <= totalEveReqRNFloat+0.001 {
 					break
 				}
 				c := out[idx]
@@ -1989,40 +2004,19 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 				if !exists || !nurse.Active || nurse.Position != "RN" || !nurse.Leader {
 					continue
 				}
-				if currentEveLeaders > eveReqLeadersFloat + 0.001 {
+				if currentEveLeaders > eveReqLeadersFloat+0.001 {
 					out[idx].ShiftCode = "ช"
 					currentEveRN -= 1.0
 					currentEveLeaders -= 1.0
 				}
 			}
-
-			// Pass 3: Excess regular RNs on "บ" -> "X" (when double-shift Leader is needed in Evening)
-			if currentEveRN > totalEveReqRNFloat + 0.001 {
-				for _, idx := range indices {
-					if currentEveRN <= totalEveReqRNFloat + 0.001 {
-						break
-					}
-					c := out[idx]
-					if c.Locked || c.ShiftCode != "บ" {
-						continue
-					}
-					nurse, exists := staffMap[c.NurseID]
-					if !exists || !nurse.Active || nurse.Position != "RN" || nurse.Leader {
-						continue
-					}
-					if (currentEveRN - currentEveLeaders) > float64(eveReqRN) + 0.001 {
-						out[idx].ShiftCode = "X"
-						currentEveRN -= 1.0
-					}
-				}
-			}
 		}
 
-		// 2. Trim excess PNs in Evening: downgrade unlocked "ชบ" -> "ช" (or excess "บ" -> "X")
-		if currentEvePN > eveReqPNFloat + 0.001 {
+		// 2. Trim excess PNs in Evening: downgrade unlocked "ชบ" -> "ช"
+		if currentEvePN > eveReqPNFloat+0.001 {
 			// Pass 1: PNs on "ชบ" -> "ช"
 			for _, idx := range indices {
-				if currentEvePN <= eveReqPNFloat + 0.001 {
+				if currentEvePN <= eveReqPNFloat+0.001 {
 					break
 				}
 				c := out[idx]
@@ -2036,28 +2030,9 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 				out[idx].ShiftCode = "ช"
 				currentEvePN -= 1.0
 			}
-
-			// Pass 2: Excess PNs on "บ" -> "X"
-			if currentEvePN > eveReqPNFloat + 0.001 {
-				for _, idx := range indices {
-					if currentEvePN <= eveReqPNFloat + 0.001 {
-						break
-					}
-					c := out[idx]
-					if c.Locked || c.ShiftCode != "บ" {
-						continue
-					}
-					nurse, exists := staffMap[c.NurseID]
-					if !exists || !nurse.Active || nurse.Position != "PN" {
-						continue
-					}
-					out[idx].ShiftCode = "X"
-					currentEvePN -= 1.0
-				}
-			}
 		}
 
-		// 3. Chronological Dynamic Night Shift Cap & Comprehensive Pruning:
+		// 3. Chronological Dynamic Night Shift Cap & Calculations:
 		// The shift immediately preceding today's Night shift (00:00 - 08:00) is Yesterday's Evening shift (16:00 - 24:00).
 		// If yesterday's Evening shift had a deficit (e.g. Target 4, actual 3.5 => deficit 0.5),
 		// today's Night shift is capped at Target + Deficit (e.g. Target 4.0 + 0.5 = 4.5 max, CANNOT be 5.0).
@@ -2256,6 +2231,152 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 			}
 		}
 
+		totalDayNightPN := 0.0
+		for _, idx := range indices {
+			c := out[idx]
+			if c.ShiftCode == "" || c.ShiftCode == "X" || c.ShiftCode == "x" || c.ShiftCode == "L" || c.ShiftCode == "V" || c.ShiftCode == "v" || c.ShiftCode == "Va" {
+				continue
+			}
+			code := strings.TrimSpace(c.ShiftCode)
+			if code == "ด" || code == "ชด" || code == "บด" || code == "N" || code == "Night" || code == "12N" {
+				nurse, exists := staffMap[c.NurseID]
+				if exists && nurse.Active && nurse.Position == "PN" {
+					totalDayNightPN += 1.0
+				}
+			}
+		}
+
+		nextDateStr := ""
+		if parseErr == nil {
+			nextDateStr = parsedDate.AddDate(0, 0, 1).Format("2006-01-02")
+		}
+
+		nightReliefCode := "N"
+		if _, ok := shiftMap["Night"]; ok {
+			nightReliefCode = "Night"
+		}
+		if _, ok := shiftMap["N"]; ok {
+			nightReliefCode = "N"
+		}
+
+		// Night Deficit Relief for RN: If night staffing is under-covered on this date,
+		// find an RN working Evening ("บ") whose next day is OFF/Leave ("X", "L", "V"),
+		// and safely convert their shift to 12h Night ("N") to fulfill the night requirement.
+		// (Ran BEFORE trimming excess Evening "บ" -> "X" so that useful nurses are utilized rather than discarded).
+		if totalNightReqRNFloat > 0 && totalDayNightRN < totalNightReqRNFloat-0.001 && nextDateStr != "" {
+			for _, idx := range indices {
+				if totalDayNightRN >= totalNightReqRNFloat-0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "บ" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "RN" {
+					continue
+				}
+				if !isNurseAllowedShift(nurse, nightReliefCode) {
+					continue
+				}
+				nextShift := getShift(c.NurseID, nextDateStr)
+				if !isOffOrLeave(nextShift) {
+					continue
+				}
+				if !isSafeTransition(c.NurseID, date, nightReliefCode) {
+					continue
+				}
+				// Ensure Evening is not made understaffed below its target
+				if totalEveReqRNFloat > 0 && (currentEveRN-0.5) < totalEveReqRNFloat-0.001 {
+					continue
+				}
+				out[idx].ShiftCode = nightReliefCode
+				totalDayNightRN += 1.0
+				currentNightRN += 1.0
+				currentEveRN -= 0.5
+				if nurse.Leader {
+					currentNightLeaders += 1.0
+				}
+			}
+		}
+
+		// Night Deficit Relief for PN: If night staffing is under-covered on this date,
+		// find a PN working Evening ("บ") whose next day is OFF/Leave ("X", "L", "V"),
+		// and safely convert their shift to 12h Night ("N") to fulfill the night requirement.
+		if nightReqPNFloat > 0 && totalDayNightPN < nightReqPNFloat-0.001 && nextDateStr != "" {
+			for _, idx := range indices {
+				if totalDayNightPN >= nightReqPNFloat-0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "บ" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "PN" {
+					continue
+				}
+				if !isNurseAllowedShift(nurse, nightReliefCode) {
+					continue
+				}
+				nextShift := getShift(c.NurseID, nextDateStr)
+				if !isOffOrLeave(nextShift) {
+					continue
+				}
+				if !isSafeTransition(c.NurseID, date, nightReliefCode) {
+					continue
+				}
+				// Ensure Evening is not made understaffed below its target
+				if eveReqPNFloat > 0 && (currentEvePN-0.5) < eveReqPNFloat-0.001 {
+					continue
+				}
+				out[idx].ShiftCode = nightReliefCode
+				totalDayNightPN += 1.0
+				currentNightPN += 1.0
+				currentEvePN -= 0.5
+			}
+		}
+
+		// Evening Pass 3 (RN): Trim remaining excess regular RNs on "บ" -> "X" ONLY if removing 1 full shift still meets target
+		if currentEveRN > totalEveReqRNFloat+0.001 {
+			for _, idx := range indices {
+				if (currentEveRN - 1.0) < totalEveReqRNFloat-0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "บ" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "RN" || nurse.Leader {
+					continue
+				}
+				if (currentEveRN - currentEveLeaders - 1.0) >= float64(eveReqRN)-0.001 {
+					out[idx].ShiftCode = "X"
+					currentEveRN -= 1.0
+				}
+			}
+		}
+
+		// Evening Pass 2 (PN): Trim remaining excess PNs on "บ" -> "X" ONLY if removing 1 full shift still meets target
+		if currentEvePN > eveReqPNFloat+0.001 {
+			for _, idx := range indices {
+				if (currentEvePN - 1.0) < eveReqPNFloat-0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "บ" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "PN" {
+					continue
+				}
+				out[idx].ShiftCode = "X"
+				currentEvePN -= 1.0
+			}
+		}
+
 		// Trim excess RNs in Night if exceeding max allowed night cap (e.g. 4 'ด' + 1 'N' = 5.0 -> 4.0 <= maxAllowedNightRN):
 		if totalNightReqRNFloat > 0 && (currentNightRN > maxAllowedNightRN+0.001 || totalDayNightRN > maxAllowedNightRN+0.001) {
 			// Method 1: If morning shift has a nurse on "ชบ" or "D"/"Day"/"12D", and night shift has a nurse on "N"/"Night"/"12N":
@@ -2358,21 +2479,6 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 					totalDayNightRN -= 1.0
 					currentNightRN -= 1.0
 					currentNightLeaders -= 1.0
-				}
-			}
-		}
-
-		totalDayNightPN := 0.0
-		for _, idx := range indices {
-			c := out[idx]
-			if c.ShiftCode == "" || c.ShiftCode == "X" || c.ShiftCode == "x" || c.ShiftCode == "L" || c.ShiftCode == "V" || c.ShiftCode == "v" || c.ShiftCode == "Va" {
-				continue
-			}
-			code := strings.TrimSpace(c.ShiftCode)
-			if code == "ด" || code == "ชด" || code == "บด" || code == "N" || code == "Night" || code == "12N" {
-				nurse, exists := staffMap[c.NurseID]
-				if exists && nurse.Active && nurse.Position == "PN" {
-					totalDayNightPN += 1.0
 				}
 			}
 		}

@@ -90,14 +90,8 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 	if pnEveRate == 0 {
 		pnEveRate = 180
 	}
-	rnOtRate := r.Policy.Compensation.RNOTRate
-	if rnOtRate == 0 {
-		rnOtRate = 800
-	}
-	pnOtRate := r.Policy.Compensation.PNOTRate
-	if pnOtRate == 0 {
-		pnOtRate = 600
-	}
+	rnOtHourlyRate := getHourlyOTRate(r.Policy.Compensation.RNOTRate, 100)
+	pnOtHourlyRate := getHourlyOTRate(r.Policy.Compensation.PNOTRate, 75)
 
 	// 1. Calculate Nurse Stats
 	nurseStats := make([]domain.NurseMonthStat, 0, len(r.Staff))
@@ -215,14 +209,14 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 		// Role-based rates
 		isPN := nurse.Position == "PN" || nurse.Position == "pn"
 		eveRate := rnEveRate
-		otRate := rnOtRate
+		otHourlyRate := rnOtHourlyRate
 		if isPN {
 			eveRate = pnEveRate
-			otRate = pnOtRate
+			otHourlyRate = pnOtHourlyRate
 		}
 
 		eveNightPay := payableEveNightShifts * eveRate
-		otPay := otShifts * otRate
+		otPay := otHours * otHourlyRate
 		totalPay := eveNightPay + otPay
 
 		// Apply manual payroll overrides if present
@@ -235,10 +229,15 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 					payableEveNightShifts = o.OverrideValue
 					eveNightPay = payableEveNightShifts * eveRate
 					totalPay = eveNightPay + otPay
+				case "ot_hours":
+					otHours = o.OverrideValue
+					otShifts = otHours / 8.0
+					otPay = otHours * otHourlyRate
+					totalPay = eveNightPay + otPay
 				case "ot_shifts":
 					otShifts = o.OverrideValue
 					otHours = otShifts * 8.0
-					otPay = otShifts * otRate
+					otPay = otHours * otHourlyRate
 					totalPay = eveNightPay + otPay
 				case "eve_night_pay":
 					eveNightPay = o.OverrideValue
@@ -533,3 +532,16 @@ func minInt(a, b int) int {
 	}
 	return b
 }
+
+// getHourlyOTRate parses OT rate, handling both hourly rate (e.g. 100 ฿/hr, 75 ฿/hr)
+// and legacy 8-hour shift rate (e.g. 800 ฿/8h -> 100 ฿/hr, 600 ฿/8h -> 75 ฿/hr).
+func getHourlyOTRate(rate float64, defaultHourly float64) float64 {
+	if rate <= 0 {
+		return defaultHourly
+	}
+	if rate > 250 {
+		return rate / 8.0
+	}
+	return rate
+}
+

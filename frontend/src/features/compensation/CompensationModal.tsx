@@ -33,12 +33,22 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
     return count > 0 ? count : 22;
   };
 
+  const initRnOtRate = () => {
+    if (!comp.rnOtRate) return 100;
+    return comp.rnOtRate > 250 ? Math.round(comp.rnOtRate / 8) : comp.rnOtRate;
+  };
+
+  const initPnOtRate = () => {
+    if (!comp.pnOtRate) return 75;
+    return comp.pnOtRate > 250 ? Math.round(comp.pnOtRate / 8) : comp.pnOtRate;
+  };
+
   const [workingDays, setWorkingDays] = useState<number>(defaultWorkingDays);
   const [allowanceCap, setAllowanceCap] = useState<number>(comp.allowanceCap ?? 0);
   const [rnEveNightRate, setRnEveNightRate] = useState<number>(comp.rnEveNightRate ?? 240);
   const [pnEveNightRate, setPnEveNightRate] = useState<number>(comp.pnEveNightRate ?? 180);
-  const [rnOtRate, setRnOtRate] = useState<number>(comp.rnOtRate ?? 800);
-  const [pnOtRate, setPnOtRate] = useState<number>(comp.pnOtRate ?? 600);
+  const [rnOtRate, setRnOtRate] = useState<number>(initRnOtRate);
+  const [pnOtRate, setPnOtRate] = useState<number>(initPnOtRate);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -270,16 +280,32 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                     <input
                       type="number"
                       min={0}
-                      step={50}
+                      step={5}
                       value={rnOtRate}
                       onChange={(e) => setRnOtRate(Number(e.target.value))}
                       className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                     />
-                    <span className="text-slate-500 text-[11px] whitespace-nowrap font-medium">บาท/เวร</span>
+                    <span className="text-emerald-700 font-bold text-[11px] whitespace-nowrap">บาท/ชม.</span>
                   </div>
-                  <p className="text-[10px] text-emerald-700 mt-1">
-                    ~{(rnOtRate / 8).toFixed(0)} บาท/ชม.
-                  </p>
+                  <div className="flex items-center justify-between text-[10px] text-emerald-700 mt-1">
+                    <span>~{(rnOtRate * 8).toLocaleString()} บ./เวร (8 ชม.)</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[80, 100, 120, 150].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setRnOtRate(r)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded border font-semibold cursor-pointer ${
+                          rnOtRate === r
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-emerald-50"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -319,16 +345,32 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                     <input
                       type="number"
                       min={0}
-                      step={50}
+                      step={5}
                       value={pnOtRate}
                       onChange={(e) => setPnOtRate(Number(e.target.value))}
                       className="w-full px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-sky-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
                     />
-                    <span className="text-slate-500 text-[11px] whitespace-nowrap font-medium">บาท/เวร</span>
+                    <span className="text-sky-700 font-bold text-[11px] whitespace-nowrap">บาท/ชม.</span>
                   </div>
-                  <p className="text-[10px] text-sky-700 mt-1">
-                    ~{(pnOtRate / 8).toFixed(0)} บาท/ชม.
-                  </p>
+                  <div className="flex items-center justify-between text-[10px] text-sky-700 mt-1">
+                    <span>~{(pnOtRate * 8).toLocaleString()} บ./เวร (8 ชม.)</span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1">
+                    {[60, 75, 90, 100].map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setPnOtRate(r)}
+                        className={`px-1.5 py-0.5 text-[10px] rounded border font-semibold cursor-pointer ${
+                          pnOtRate === r
+                            ? "bg-sky-600 text-white border-sky-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:bg-sky-50"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -338,15 +380,15 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
           <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl text-xs space-y-2 text-amber-950">
             <div className="flex items-center gap-1.5 font-bold">
               <InformationCircleIcon className="w-4 h-4 text-amber-600" />
-              <span>สูตรการคำนวณเงินค่าตอบแทนและชั่วโมงทำงาน:</span>
+              <span>สูตรการคำนวณค่าเวร & ค่าล่วงเวลา (OT):</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-amber-800 pl-1">
-              <div>• <strong>เครดิตชั่วโมงรวม:</strong> ชม. ทำงานจริง + วันลาที่อนุมัติ (8 ชม./วันลา)</div>
-              <div>• <strong>ชั่วโมง OT:</strong> Max(0, เครดิตชั่วโมงรวม - {baseHours} ชม. ปกติ)</div>
-              <div>• <strong>เวร OT:</strong> ชั่วโมง OT ÷ 8 (คำนวณเป็นเวร × เรท OT)</div>
-              <div>• <strong>หน่วยเวร บด:</strong> บ่าย (1.0), ดึก (1.0), Day 12h (0.5), Night 12h (1.5), บด (2.0)</div>
-              <div>• <strong>ค่าเวร บด (บาท):</strong> Min(หน่วยเวร บด รวม, เพดานสิทธิเบิก) × เรทค่าเวร บด</div>
-              <div>• <strong>รวมเงินสุทธิ (บาท):</strong> ค่าเวร บด (เบิกได้จริง) + เงิน OT</div>
+              <div>• <strong>ค่าเวร:</strong> บ/ด × ค่าเวรบ่าย-ดึก (บ/ด) (แยกตาม RN, PN)</div>
+              <div>• <strong>OT (เวร):</strong> (ช + บ + ด) - (จำนวนวันทำการ)</div>
+              <div>• <strong>เงิน OT:</strong> OT × 8 × ค่าเวรล่วงเวลา (OT ต่อชั่วโมง) (แยกตาม RN, PN)</div>
+              <div>• <strong>รวมเงินสุทธิ:</strong> ค่าเวร (บ/ด) + เงิน OT</div>
+              <div>• <strong>การนับหน่วย บ/ด:</strong> บ (1.0), ด (1.0), Day 12h (0.5), Night 12h (1.5), ชบ (1.0), บด (2.0)</div>
+              <div>• <strong>เพดานสิทธิเบิก:</strong> {allowanceCap > 0 ? `จำกัดสิทธิเบิกค่าเวรสูงสุดไม่เกิน ${allowanceCap} หน่วย/เดือน` : "เบิกได้ตามจริงไม่จำกัดเพดาน"}</div>
             </div>
           </div>
         </div>
