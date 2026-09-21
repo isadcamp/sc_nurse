@@ -11,6 +11,7 @@ import {
   ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { request } from "@/lib/api";
+import { formatThaiMonthYear } from "@/lib/dateUtils";
 import type { Roster, RosterResponse } from "@/types/schedule";
 
 interface CompensationPanelProps {
@@ -140,7 +141,7 @@ export function CompensationPanel({
               </h2>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              กำหนดเกณฑ์วันทำการปกติ, เรทค่าเวรบ่าย-ดึก (บด), ค่า OT และเพดานสิทธิเบิกประจำเดือน {roster.month}/{roster.year}
+              กำหนดเกณฑ์วันทำการปกติ, เรทค่าเวรบ่าย-ดึก (บด), ค่า OT และเพดานสิทธิเบิกประจำเดือน {formatThaiMonthYear(roster.month, roster.year)}
             </p>
           </div>
         </div>
@@ -187,7 +188,7 @@ export function CompensationPanel({
               <span>เกณฑ์วันทำการประจำเดือน (Working Days Base)</span>
             </div>
             <span className="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-0.5 rounded-full">
-              เดือน {roster.month}/{roster.year}
+              {formatThaiMonthYear(roster.month, roster.year)}
             </span>
           </div>
 

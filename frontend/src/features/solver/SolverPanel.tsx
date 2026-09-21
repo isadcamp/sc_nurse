@@ -13,6 +13,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import type { Cell, Roster, RosterResponse, Violation } from "@/types/schedule";
+import { formatThaiMonthYear } from "@/lib/dateUtils";
 
 type Score = { coverage: number; fairness: number; preference: number; stability: number; total: number };
 type Readiness = {
@@ -668,7 +669,7 @@ export function SolverPanel({ roster, token, wardName, onApplied, onRosterUpdate
           </div>
         </div>
 
-        <p className="text-slate-700">{wardName || roster.wardId} · {roster.month}/{roster.year + 543} · {start || "ต้นเดือน"} ถึง {end || "สิ้นเดือน"} · {nurseIds.length || roster.staff.filter(n => n.active).length} คน{simulation ? " · โหมดจำลอง (บันทึกไม่ได้)" : ""}</p>
+        <p className="text-slate-700">{wardName || roster.wardId} · {formatThaiMonthYear(roster.month, roster.year)} · {start || "ต้นเดือน"} ถึง {end || "สิ้นเดือน"} · {nurseIds.length || roster.staff.filter(n => n.active).length} คน{simulation ? " · โหมดจำลอง (บันทึกไม่ได้)" : ""}</p>
         <details className="rounded-lg border border-slate-200 p-4">
           <summary className="cursor-pointer font-medium">ตัวเลือกเพิ่มเติม</summary>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">

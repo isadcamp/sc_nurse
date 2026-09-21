@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ModalFrame } from "@/components/ui/ModalFrame";
 import { BanknotesIcon, CalendarDaysIcon, CheckCircleIcon, SparklesIcon, InformationCircleIcon } from "@heroicons/react/24/outline";
 import { request } from "@/lib/api";
+import { formatThaiMonthYear } from "@/lib/dateUtils";
 import type { Roster, RosterResponse } from "@/types/schedule";
 
 interface CompensationModalProps {
@@ -120,7 +121,7 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                 ตั้งค่าวันทำการ & ค่าตอบแทนเวร/OT ประจำเดือน — {roster.wardId}
               </h3>
               <p className="text-xs text-slate-400">
-                กำหนดเกณฑ์วันทำการปกติ, เรทค่าเวรบ่าย-ดึก (บด), ค่า OT และเพดานสิทธิเบิกประจำเดือน {roster.month}/{roster.year}
+                กำหนดเกณฑ์วันทำการปกติ, เรทค่าเวรบ่าย-ดึก (บด), ค่า OT และเพดานสิทธิเบิกประจำเดือน {formatThaiMonthYear(roster.month, roster.year)}
               </p>
             </div>
           </div>
@@ -153,7 +154,7 @@ export function CompensationModal({ roster, token, isOpen, onClose, onSaved }: C
                     <span>เกณฑ์วันทำการประจำเดือน (Working Days Base)</span>
                   </div>
                   <span className="text-[11px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-md">
-                    เดือน {roster.month}/{roster.year}
+                    {formatThaiMonthYear(roster.month, roster.year)}
                   </span>
                 </div>
 

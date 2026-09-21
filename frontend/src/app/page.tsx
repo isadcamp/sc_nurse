@@ -31,6 +31,7 @@ import { CoverageSummaryRow, computeRosterDailyCoverage } from "@/components/sch
 import { NurseStatsColumn } from "@/components/schedule/NurseStatsColumn";
 import { PayrollDrilldownModal } from "@/features/dashboard/PayrollDrilldownModal";
 import { OfficialRosterPrint } from "@/components/print/OfficialRosterPrint";
+import { formatThaiMonthYear } from "@/lib/dateUtils";
 import type { Cell, Edit, Nurse, RosterResponse, ScheduleSummary, Violation, Ward, Staff } from "@/types/schedule";
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; icon: string }> = {
@@ -107,6 +108,7 @@ export default function Home() {
   const [year, mon] = month.split("-").map(Number);
   const daysInMonth = Number.isFinite(year) && mon >= 1 && mon <= 12 ? new Date(Date.UTC(year, mon, 0)).getUTCDate() : 0;
   const dates = Array.from({ length: daysInMonth }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
+  const thaiMonthYear = useMemo(() => formatThaiMonthYear(month), [month]);
 
   const loadWards = useCallback(async () => {
     try {
@@ -507,11 +509,22 @@ const currentWardObj = wards.find((w) => w.id === ward);
   ];
   const workflowPosition = activeWorkspace === "home" ? -1 : activeWorkspace === "preflight" ? 0 : activeWorkspace === "solver" ? 1 : activeWorkspace === "review" ? 3 : activeWorkspace === "approval" ? (roster?.status === "published" ? 5 : 4) : 2;
   function openWorkspace(workspace: typeof activeWorkspace) {
+    if (workspace === "solver") {
+      setActiveWorkspace("home");
+      setActiveTab("grid");
+      setShowRightPanel(false);
+      setActiveCell(null);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const target = document.getElementById("home-solver");
+        target?.scrollIntoView({ behavior: "smooth", block: "start" });
+        target?.focus({ preventScroll: true });
+      }));
+      return;
+    }
     setActiveWorkspace(workspace);
     setActiveTab(
       workspace === "overview" ? "dashboard" :
       workspace === "proposals" ? "ai" :
-      workspace === "solver" ? "solver" :
       workspace === "policy" ? "policy" : "grid"
     );
     setShowRightPanel(workspace === "review");
@@ -675,9 +688,8 @@ const holidaySet = new Set<string>();
           <div className="nf-brand"><BuildingOffice2Icon aria-hidden="true" /><div className="nav-label"><strong>NurseFlow <span>2.0</span></strong><p>ระบบบริหารและจัดตารางเวร</p></div></div>
           <nav className="nf-menu" aria-label="พื้นที่ทำงาน">
             {[
-              {label:"หน้าแรก / งานถัดไป", icon:ClipboardDocumentCheckIcon, key:"home" as const},
+              {label:"งานจัดตารางเวร", icon:ClipboardDocumentCheckIcon, key:"home" as const},
               {label:"เตรียมข้อมูล", icon:ClipboardDocumentCheckIcon, key:"preflight" as const},
-              {label:"จัดเวร AI", icon:SparklesIcon, key:"solver" as const},
               {label:"จัดตารางเวร", icon:CalendarDaysIcon, key:"schedule" as const},
               {label:"ภาพรวม", icon:ChartBarIcon, key:"overview" as const},
               {label:"ข้อเสนอ", icon:SparklesIcon, key:"proposals" as const},
@@ -700,7 +712,7 @@ const holidaySet = new Set<string>();
         <div className="flex items-center gap-3 min-w-0">
           <button className="nf-icon-button" onClick={() => setShowLeftPanel(!showLeftPanel)} aria-label="เปิด/ปิดเมนูหลัก" aria-expanded={showLeftPanel}><Bars3Icon/></button>
           <div><h1>{
-            activeWorkspace === "home" ? "งานจัดตารางเวรของคุณ" :
+            activeWorkspace === "home" ? "งานจัดตารางเวร" :
             activeWorkspace === "overview" ? "ภาพรวมตารางเวร" :
             activeWorkspace === "proposals" ? "ข้อเสนอการจัดเวร" :
             activeWorkspace === "approval" ? "อนุมัติและประกาศ" :
@@ -715,12 +727,19 @@ const holidaySet = new Set<string>();
             activeWorkspace === "leave" ? "จัดการคำขอลา (Leave Management)" :
             activeWorkspace === "users" ? "บริหารจัดการผู้ใช้งานระบบ (User Management)" :
             "จัดตารางเวร"
-          }</h1><p>{currentWardName}</p></div>
+          }</h1>
+          <p className="text-xs text-slate-500 font-medium">{currentWardName} · ประจำเดือน <span className="font-bold text-blue-700">{thaiMonthYear}</span></p></div>
         </div>
         <div className="nf-context-controls">
           <label>หน่วยงาน<select aria-label="หน่วยงาน" value={ward} onChange={e => {clearScheduleContext(); setWard(e.target.value);}} disabled={busy}>{accessibleWards.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</select></label>
           <button className="nf-icon-button" title="จัดการแผนกและหอผู้ป่วย" aria-label="จัดการแผนก" onClick={() => openWorkspace("departments")}><BuildingOffice2Icon className="w-4 h-4 text-blue-600"/></button>
-          <label>เดือน<input aria-label="เดือน" type="month" value={month} onChange={e => {clearScheduleContext(); setMonth(e.target.value);}} disabled={busy}/></label>
+          <label className="flex items-center gap-1.5">
+            <span>เดือน</span>
+            <input aria-label="เดือน" type="month" value={month} onChange={e => {clearScheduleContext(); setMonth(e.target.value);}} disabled={busy}/>
+            <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-xs font-bold text-blue-800 shadow-2xs whitespace-nowrap">
+              {thaiMonthYear}
+            </span>
+          </label>
           <button className="nf-button" onClick={() => void load()} disabled={busy || !month}>{busy ? <ArrowPathIcon className="animate-spin"/> : <CalendarDaysIcon/>}เปิดตาราง</button>
           {roster && <span className={`nf-status ${currentStatus.bg} ${currentStatus.text}`}><span className="h-2 w-2 rounded-full bg-current"/>{currentStatus.label}<span className="font-normal">v{roster.version}</span></span>}
         </div>
@@ -768,17 +787,42 @@ const holidaySet = new Set<string>();
         <main className="min-w-0" aria-busy={busy || saving}>
           {activeWorkspace === "home" && (
             <section className="space-y-5 p-4 sm:p-6" aria-labelledby="work-home-title">
-              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5 sm:p-7">
-                <p className="text-sm text-blue-800">{currentWardName} · {month}</p>
-                <h2 id="work-home-title" className="mt-2 text-xl font-bold text-slate-900">{roster ? "งานที่ต้องทำต่อ" : "เริ่มจากเลือกหน่วยงานและเดือน"}</h2>
-                <p className="mt-2 text-sm text-slate-700">{roster ? `กำลังเปิดตาราง #${roster.id} · v${roster.version} — ${currentStatus.label}` : "เปิดตารางเดือนนี้เพื่อค้นหางานเดิม หากยังไม่มีตาราง ให้เตรียมข้อมูลก่อนสร้างตารางใหม่"}</p>
+              <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-indigo-50/40 to-white p-5 sm:p-7 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                    <BuildingOffice2Icon className="w-3.5 h-3.5" />
+                    {currentWardName}
+                  </span>
+                  {roster && (
+                    <span className={`nf-status ${currentStatus.bg} ${currentStatus.text}`}>
+                      <span className="h-2 w-2 rounded-full bg-current"/>
+                      {currentStatus.label} v{roster.version}
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3.5">
+                  <div className="text-2xl sm:text-3xl font-extrabold text-blue-950 tracking-tight flex items-center gap-2.5">
+                    <CalendarDaysIcon className="w-7 h-7 sm:w-8 sm:h-8 text-blue-600 shrink-0" />
+                    <span>ประจำเดือน {thaiMonthYear}</span>
+                  </div>
+                  <h2 id="work-home-title" className="mt-1.5 text-base sm:text-lg font-bold text-slate-700">
+                    {roster ? "งานที่ต้องทำต่อ" : "เริ่มจากเลือกหน่วยงานและเดือน"}
+                  </h2>
+                </div>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {roster
+                    ? `กำลังเปิดตาราง #${roster.id} · ฉบับ v${roster.version} — สถานะ: ${currentStatus.label}`
+                    : `เปิดตารางประจำเดือน ${thaiMonthYear} เพื่อค้นหางานเดิม หากยังไม่มีตาราง ให้เตรียมข้อมูลก่อนสร้างตารางใหม่`}
+                </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   {!roster ? <>
                     <button className="nf-button nf-button-primary" disabled={busy || !month || !ward} onClick={() => void load()}>เปิดตารางเดือนนี้</button>
                     {isHead && <button className="nf-button" onClick={() => openWorkspace("preflight")}>เตรียมข้อมูลก่อนจัดเวร</button>}
                   </> : <>
-                    <button className="nf-button nf-button-primary" disabled={busy} onClick={() => openWorkspace(!isHead || roster.status === "published" || roster.status === "closed" ? "schedule" : criticalViolations.length ? "review" : !roster.assignments.length ? "solver" : "approval")}>
-                      {!isHead ? "ดูตารางเวร" : roster.status === "published" ? "ดูตารางที่ประกาศใช้" : roster.status === "closed" ? "ดูตารางที่ปิดงวด" : criticalViolations.length ? `ดูจุดที่ต้องแก้ไข ${criticalViolations.length} จุด` : !roster.assignments.length ? "เริ่มจัดตารางเวร" : roster.status === "under_review" ? "ตรวจเพื่ออนุมัติ" : roster.status === "approved" ? "ไปประกาศใช้ตาราง" : "ตรวจและส่งอนุมัติ"}
+                    <button className="nf-button nf-button-primary" disabled={busy} onClick={() => openWorkspace(!isHead || roster.status === "published" || roster.status === "closed" ? "schedule" : canEdit && !roster.assignments.length ? "solver" : criticalViolations.length ? "review" : "approval")}>
+                      {!isHead ? "ดูตารางเวร" : roster.status === "published" ? "ดูตารางที่ประกาศใช้" : roster.status === "closed" ? "ดูตารางที่ปิดงวด" : canEdit && !roster.assignments.length ? "เริ่มจัดตารางเวร" : criticalViolations.length ? `ดูจุดที่ต้องแก้ไข ${criticalViolations.length} จุด` : roster.status === "under_review" ? "ตรวจเพื่ออนุมัติ" : roster.status === "approved" ? "ไปประกาศใช้ตาราง" : "ตรวจและส่งอนุมัติ"}
                     </button>
                     {canEdit && <button className="nf-button" onClick={() => openWorkspace("schedule")}>จัดตารางต่อ</button>}
                   </>}
@@ -797,8 +841,63 @@ const holidaySet = new Set<string>();
                   <p className="mt-1 text-sm text-slate-600">{roster.status === "published" ? "ฉบับนี้ผ่านขั้นตอนประกาศใช้งานแล้ว" : roster.status === "closed" ? "ใช้ดูข้อมูลย้อนหลังของงวดที่ปิดแล้ว" : "แม้ผ่านผลตรวจแล้ว ยังต้องอนุมัติและประกาศก่อนนำไปใช้"}</p>
                 </article>
               </div>}
-              <section className="rounded-xl border border-slate-200 bg-white p-5" aria-labelledby="version-list-title">
-                <h3 id="version-list-title" className="font-bold">ตารางแต่ละฉบับในเดือนที่เลือก</h3>
+          {roster && canEdit && (
+            <div id="home-solver" tabIndex={-1} className="scroll-mt-4 flex-1 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 overflow-y-auto shadow-2xs space-y-6">
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                    <SparklesIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base font-bold text-slate-900">จัดเวรอัตโนมัติสำหรับฉบับที่กำลังทำ</h2>
+
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      ตาราง #{roster.id} · v{roster.version} — บันทึกผลลงฉบับนี้ แล้วตรวจและส่งอนุมัติก่อนประกาศใช้
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openWorkspace("schedule")}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs"
+                >
+                  <span>เปิดตารางเพื่อจัดเอง</span>
+                </button>
+              </div>
+
+              <SolverPanel
+                key={roster.id}
+                wardName={currentWardName}
+                roster={roster}
+                token={token}
+                onRosterUpdated={(res) => {
+                  setData(res);
+                }}
+                onFixIssue={(path) => {
+                  if (path.includes("roster-policy") || path.includes("targets") || path.includes("staffing")) {
+                    openWorkspace("policy");
+                  } else if (path.includes("boundary")) {
+                    openWorkspace("boundary");
+                  } else if (path.includes("staff")) {
+                    openWorkspace("staff");
+                  } else if (path.includes("leave")) {
+                    openWorkspace("leave");
+                  }
+                }}
+                onApplied={(res) => {
+                  setData(res);
+                  setNotice("บันทึกผลจัดเวรแล้ว กรุณาตรวจตารางก่อนส่งอนุมัติและประกาศใช้");
+                  openWorkspace("schedule");
+                }}
+                onBackToGrid={() => openWorkspace("schedule")}
+              />
+            </div>
+          )}
+
+              <details className="rounded-xl border border-slate-200 bg-white p-5">
+                <summary className="cursor-pointer font-bold">ตารางแต่ละฉบับในเดือนที่เลือก ({versions.length})</summary>
                 <p className="mt-1 text-sm text-slate-600">แสดงฉบับที่ประกาศใช้ก่อน เลือกเปิดฉบับเพื่อดูผลตรวจล่าสุด</p>
                 {!versions.length ? <p className="mt-4 text-sm text-slate-600">ยังไม่มีรายการให้แสดง กรุณาเปิดตารางเดือนนี้ก่อน หากไม่พบตาราง ให้เริ่มที่เตรียมข้อมูล</p> : <ul className="mt-4 space-y-3">
                   {[...versions].sort((a, b) => Number(b.status === "published") - Number(a.status === "published") || b.id - a.id).map(version => <li key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
@@ -810,7 +909,7 @@ const holidaySet = new Set<string>();
                     <button className="nf-button" disabled={busy} onClick={() => void loadScheduleById(version.id)}>เปิดฉบับ #{version.id}</button>
                   </li>)}
                 </ul>}
-              </section>
+              </details>
               <p className="text-sm text-slate-600">ลำดับงาน: เตรียมข้อมูล → จัดตาราง → ตรวจข้อผิดพลาด → ส่งอนุมัติ → ประกาศใช้</p>
             </section>
           )}
@@ -826,7 +925,7 @@ const holidaySet = new Set<string>();
             <section className="approval-panel" aria-labelledby="approval-title">
               {!roster ? <div className="approval-empty"><h2 id="approval-title">ยังไม่มีตารางสำหรับตรวจอนุมัติ</h2><p>เปิดหรือสร้างตารางเวรก่อนเข้าสู่ขั้นตอนนี้</p></div> : <>
                 <div className="approval-heading"><div><div className="context-eyebrow">ตรวจความพร้อมก่อนประกาศ</div><h2 id="approval-title">ตรวจ อนุมัติ และประกาศ</h2><p>ตรวจข้อมูลสรุปก่อนเปลี่ยนสถานะตารางเวร</p></div><span className="approval-version">v{roster.version}</span></div>
-                <div className="approval-summary-grid"><div><span>หน่วยงาน</span><strong>{currentWardName}</strong></div><div><span>เดือน</span><strong>{month}</strong></div><div><span>บุคลากร</span><strong>{roster.staff.length} คน</strong></div><div><span>ปัญหา Critical</span><strong className={criticalViolations.length ? "text-rose-700" : "text-emerald-700"}>{criticalViolations.length}</strong></div></div>
+                <div className="approval-summary-grid"><div><span>หน่วยงาน</span><strong>{currentWardName}</strong></div><div><span>ประจำเดือน</span><strong className="text-blue-900 font-bold">{thaiMonthYear}</strong></div><div><span>บุคลากร</span><strong>{roster.staff.length} คน</strong></div><div><span>ปัญหา Critical</span><strong className={criticalViolations.length ? "text-rose-700" : "text-emerald-700"}>{criticalViolations.length}</strong></div></div>
                 <div className="approval-checklist"><div className={criticalViolations.length === 0 ? "is-ready" : "is-blocked"}><span>{criticalViolations.length === 0 ? "✓" : "!"}</span><div><strong>ตรวจข้อบังคับ</strong><p>{criticalViolations.length === 0 ? "ไม่พบปัญหาระดับ Critical" : `ยังมี ${criticalViolations.length} ปัญหาที่ต้องแก้ก่อนส่งตรวจ`}</p></div></div><div className="is-ready"><span>✓</span><div><strong>ฉบับตาราง</strong><p>กำลังตรวจสอบฉบับ v{roster.version}</p></div></div></div>
                 <div className="approval-actions">
                   {isHead && roster.status === "under_review" && (
@@ -868,7 +967,7 @@ const holidaySet = new Set<string>();
                 <div>
                   <div className="context-eyebrow">ขั้นตอนที่ 1</div>
                   <h2 id="preflight-title">เตรียมข้อมูลก่อนจัดเวร</h2>
-                  <p>ตรวจรายการสำคัญให้ครบก่อนสร้างหรือแก้ตารางเวร</p>
+                  <p>{currentWardName} · ประจำเดือน <span className="font-bold text-teal-800">{thaiMonthYear}</span></p>
                 </div>
                 <button type="button" className="primary-action" onClick={() => { openWorkspace("schedule"); }} disabled={!roster}>เข้าสู่ตารางเวร</button>
               </div>
@@ -937,51 +1036,46 @@ const holidaySet = new Set<string>();
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Schedule Month & Ward Header Banner */}
+                  <div className="flex items-center justify-between flex-wrap gap-3 bg-white border border-slate-200 rounded-2xl p-3.5 sm:px-5 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 shrink-0">
+                        <CalendarDaysIcon className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-blue-600">ตารางเวรประจำเดือน</div>
+                        <div className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
+                          {thaiMonthYear}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xs text-slate-700 font-bold bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                        {currentWardName}
+                      </span>
+                      <span className={`nf-status ${currentStatus.bg} ${currentStatus.text}`}>
+                        <span className="h-2 w-2 rounded-full bg-current" />
+                        {currentStatus.label} v{roster.version}
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Hybrid View Tab Filter Bar */}
                   <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                    <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 border border-slate-200 rounded-2xl shadow-2xs">
-                      <button
-                        type="button"
-                        onClick={() => setStaffViewFilter("all")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                          staffViewFilter === "all"
-                            ? "bg-white text-slate-900 shadow-xs border border-slate-300"
-                            : "text-slate-600 hover:text-slate-900"
-                        }`}
-                      >
-                        <span>👥 ทั้งหมด</span>
-                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${staffViewFilter === "all" ? "bg-slate-800 text-white" : "bg-slate-200 text-slate-700"}`}>
-                          {sortedStaff.length}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStaffViewFilter("rn")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                          staffViewFilter === "rn"
-                            ? "bg-teal-600 text-white shadow-xs"
-                            : "text-teal-800 hover:bg-teal-50"
-                        }`}
-                      >
-                        <span>🩺 พยาบาลวิชาชีพ (RN)</span>
-                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${staffViewFilter === "rn" ? "bg-teal-800 text-white" : "bg-teal-100 text-teal-800"}`}>
-                          {rnCount}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStaffViewFilter("pn")}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                          staffViewFilter === "pn"
-                            ? "bg-emerald-600 text-white shadow-xs"
-                            : "text-emerald-800 hover:bg-emerald-50"
-                        }`}
-                      >
-                        <span>🧤 ผู้ช่วยพยาบาล (PN)</span>
-                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${staffViewFilter === "pn" ? "bg-emerald-800 text-white" : "bg-emerald-100 text-emerald-800"}`}>
-                          {pnCount}
-                        </span>
-                      </button>
+                    <div role="group" aria-label="กรองประเภทบุคลากร" className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2">
+                      {([
+                        { key: "all", label: "ทั้งหมด", count: sortedStaff.length, badge: "bg-slate-200 text-slate-800", active: "border-slate-500 bg-slate-100 text-slate-900", hover: "hover:bg-slate-50" },
+                        { key: "rn", label: "พยาบาลวิชาชีพ", count: rnCount, badge: "bg-blue-100 text-blue-900", active: "border-blue-600 bg-blue-50 text-blue-950", hover: "hover:bg-blue-50" },
+                        { key: "pn", label: "ผู้ช่วยพยาบาล", count: pnCount, badge: "bg-amber-100 text-amber-900", active: "border-amber-600 bg-amber-50 text-amber-950", hover: "hover:bg-amber-50" },
+                      ] as const).map(item => {
+                        const selected = staffViewFilter === item.key;
+                        return <button key={item.key} type="button" aria-pressed={selected} onClick={() => setStaffViewFilter(item.key)} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${selected ? item.active : `border-transparent text-slate-700 ${item.hover}`}`}>
+                          {item.key === "all" ? <UsersIcon className="h-5 w-5 text-slate-700" aria-hidden="true" /> : <span className={`rounded-md px-2 py-1 font-bold ${item.badge}`}>{item.key.toUpperCase()}</span>}
+                          <span>{item.label}</span>
+                          <span className={`min-w-7 rounded-full px-2 py-0.5 text-center tabular-nums ${item.badge}`}>{item.count}</span>
+                          <CheckCircleIcon className={`h-4 w-4 shrink-0 ${selected ? "" : "invisible"}`} aria-hidden="true" />
+                        </button>;
+                      })}
                     </div>
 
                     <div className="text-xs text-slate-500 flex items-center gap-2">
@@ -998,7 +1092,7 @@ const holidaySet = new Set<string>();
 
                   <div className="matrix-container" tabIndex={0} role="region" aria-label="ตารางเวร เลื่อนเพื่อดูทุกวันที่">
                     <table className="matrix-table">
-                      <caption className="sr-only">ตารางเวร {month}</caption>
+                      <caption className="sr-only">ตารางเวรประจำเดือน {thaiMonthYear}</caption>
                       <thead>
                         <tr>
                           <th className="sticky-nurse-col p-2 text-left min-w-[240px] border-r border-slate-200">
@@ -1086,8 +1180,8 @@ const holidaySet = new Set<string>();
                                     {displayIdx}
                                   </span>
                                   <span
-                                    className={`px-1.5 py-0.5 text-[10px] font-bold rounded shrink-0 ${
-                                      nurse.position === "RN" ? "bg-teal-100 text-teal-800 border border-teal-200" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    className={`px-2 py-0.5 text-sm font-bold rounded shrink-0 ${
+                                      nurse.position.toUpperCase() === "RN" ? "bg-blue-100 text-blue-900 border border-blue-200" : nurse.position.toUpperCase() === "PN" ? "bg-amber-100 text-amber-900 border border-amber-200" : "bg-slate-100 text-slate-700 border border-slate-300"
                                     }`}
                                   >
                                     {nurse.position}
@@ -1154,13 +1248,13 @@ const holidaySet = new Set<string>();
                           if (staffViewFilter === "all") {
                             return (
                               <>
-                                {rnStaff.length > 0 && renderSectionHeader("พยาบาลวิชาชีพ (Registered Nurse - RN)", "🩺", rnStaff.length, "bg-teal-50/80", "text-teal-900", "border-teal-300")}
+                                {rnStaff.length > 0 && renderSectionHeader("พยาบาลวิชาชีพ", "RN", rnStaff.length, "bg-blue-50", "text-blue-900", "border-blue-300")}
                                 {rnStaff.map((nurse, idx) => renderRow(nurse, idx + 1))}
 
-                                {pnStaff.length > 0 && renderSectionHeader("ผู้ช่วยพยาบาล (Practical Nurse - PN)", "🧤", pnStaff.length, "bg-emerald-50/80", "text-emerald-900", "border-emerald-300")}
+                                {pnStaff.length > 0 && renderSectionHeader("ผู้ช่วยพยาบาล", "PN", pnStaff.length, "bg-amber-50", "text-amber-900", "border-amber-300")}
                                 {pnStaff.map((nurse, idx) => renderRow(nurse, rnStaff.length + idx + 1))}
 
-                                {otherStaff.length > 0 && renderSectionHeader("บุคลากรอื่นๆ (Other Staff)", "👤", otherStaff.length, "bg-slate-100", "text-slate-800", "border-slate-300")}
+                                {otherStaff.length > 0 && renderSectionHeader("บุคลากรอื่นๆ", "", otherStaff.length, "bg-slate-100", "text-slate-800", "border-slate-300")}
                                 {otherStaff.map((nurse, idx) => renderRow(nurse, rnStaff.length + pnStaff.length + idx + 1))}
                               </>
                             );
@@ -1169,7 +1263,7 @@ const holidaySet = new Set<string>();
                           if (staffViewFilter === "rn") {
                             return (
                               <>
-                                {renderSectionHeader("พยาบาลวิชาชีพ (Registered Nurse - RN)", "🩺", rnStaff.length, "bg-teal-50/80", "text-teal-900", "border-teal-300")}
+                                {renderSectionHeader("พยาบาลวิชาชีพ", "RN", rnStaff.length, "bg-blue-50", "text-blue-900", "border-blue-300")}
                                 {rnStaff.map((nurse, idx) => renderRow(nurse, idx + 1))}
                               </>
                             );
@@ -1178,7 +1272,7 @@ const holidaySet = new Set<string>();
                           if (staffViewFilter === "pn") {
                             return (
                               <>
-                                {renderSectionHeader("ผู้ช่วยพยาบาล (Practical Nurse - PN)", "🧤", pnStaff.length, "bg-emerald-50/80", "text-emerald-900", "border-emerald-300")}
+                                {renderSectionHeader("ผู้ช่วยพยาบาล", "PN", pnStaff.length, "bg-amber-50", "text-amber-900", "border-amber-300")}
                                 {pnStaff.map((nurse, idx) => renderRow(nurse, idx + 1))}
                               </>
                             );
@@ -1352,60 +1446,6 @@ const holidaySet = new Set<string>();
                 onSaved={(res) => {
                   setData(res);
                   setNotice("💾 บันทึกนโยบายและเป้าหมายชั่วโมงเรียบร้อยแล้ว");
-                }}
-                onBackToGrid={() => openWorkspace("schedule")}
-              />
-            </div>
-          )}
-          {activeWorkspace !== "preflight" && activeWorkspace !== "approval" && activeTab === "solver" && roster && (
-            <div className="flex-1 bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 overflow-y-auto shadow-2xs space-y-6">
-              <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-                    <SparklesIcon className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-base font-bold text-slate-900">สร้างแผนตารางเวร</h2>
-
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      ตรวจความพร้อม → จัดเวร → ตรวจผลและบันทึก
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => openWorkspace("schedule")}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-2xs"
-                >
-                  <span>← กลับไปหน้าตารางเวร</span>
-                </button>
-              </div>
-
-              <SolverPanel
-                key={roster.id}
-                wardName={currentWardName}
-                roster={roster}
-                token={token}
-                onRosterUpdated={(res) => {
-                  setData(res);
-                }}
-                onFixIssue={(path) => {
-                  if (path.includes("roster-policy") || path.includes("targets") || path.includes("staffing")) {
-                    openWorkspace("policy");
-                  } else if (path.includes("boundary")) {
-                    openWorkspace("boundary");
-                  } else if (path.includes("staff")) {
-                    openWorkspace("staff");
-                  } else if (path.includes("leave")) {
-                    openWorkspace("leave");
-                  }
-                }}
-                onApplied={(res) => {
-                  setData(res);
-                  setNotice("บันทึกผลจัดเวรแล้ว กรุณาตรวจตารางก่อนส่งอนุมัติและประกาศใช้");
-                  openWorkspace("schedule");
                 }}
                 onBackToGrid={() => openWorkspace("schedule")}
               />
@@ -1590,7 +1630,7 @@ const holidaySet = new Set<string>();
         )}
       </div>
 
-        <footer className="nf-footer no-print"><span role="status">{saving ? "กำลังบันทึก… " : lastSaved ? `บันทึกแล้ว ${lastSaved} · ` : ""}{roster ? `ตาราง ${month} · เจ้าหน้าที่ ${roster.staff.length} คน · ฉบับ v${roster.version}` : "เลือกหน่วยงานและเดือนเพื่อเริ่มต้น"}</span><span>NurseFlow 2.0</span></footer>
+        <footer className="nf-footer no-print"><span role="status">{saving ? "กำลังบันทึก… " : lastSaved ? `บันทึกแล้ว ${lastSaved} · ` : ""}{roster ? `ตารางประจำเดือน ${thaiMonthYear} · เจ้าหน้าที่ ${roster.staff.length} คน · ฉบับ v${roster.version}` : "เลือกหน่วยงานและเดือนเพื่อเริ่มต้น"}</span><span>NurseFlow 2.0</span></footer>
         </div>
       </div>
       {/* QUICK FLOATING SHIFT PICKER */}
