@@ -76,6 +76,8 @@ export function OfficialRosterPrint({
       if (code === "ช" || code === "Day" || code === "D") {
         m++;
         hours += code === "Day" || code === "D" ? 12 : 8;
+      } else if (code === "อบ" || code === "บห") {
+        hours += 8;
       } else if (code === "บ") {
         e++;
         hours += 8;

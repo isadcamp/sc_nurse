@@ -24,7 +24,7 @@ export function QuickShiftPicker({
   currentShift,
   isLocked,
   canLock = true,
-  shiftCodes = ["ช", "บ", "ด", "ชบ", "D", "N", "x", "L", "V"],
+  shiftCodes = ["ช", "บ", "ด", "ชบ", "อบ", "บห", "D", "N", "x", "L", "V"],
   date,
   shiftQuotas,
   position,

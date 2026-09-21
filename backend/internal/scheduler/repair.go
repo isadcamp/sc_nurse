@@ -357,8 +357,14 @@ func (s *repairSearch) evaluate(cells []domain.Cell) repairState {
    switch v.RuleCode {
    case "PREFERENCE":weight=s.roster.Policy.Weights.Preference
    case "TARGET_HOURS","TARGET_OFF","SHIFT_QUOTA","FAIRNESS":weight=s.roster.Policy.Weights.Fairness
+   case "OVER_STAFFING":weight=250.0
    }
-   cost.soft+=weight*math.Max(1,number(v.Metadata["score"]))
+   excess:=number(v.Metadata["excess"])
+   if v.RuleCode=="OVER_STAFFING" && excess>0 {
+    cost.soft+=weight*excess*50.0
+   } else {
+    cost.soft+=weight*math.Max(1,number(v.Metadata["score"]))
+   }
   }
  }
  old:=map[string]string{}
@@ -375,7 +381,7 @@ func (s *repairSearch) evaluate(cells []domain.Cell) repairState {
 func (s *repairSearch) allowed(c domain.Cell,code string) bool {
  if code=="X" {return true}
  sh,ok:=s.shifts[code]
- if !ok || code=="L" || code=="บด" {return false}
+ if !ok || code=="L" || code=="บด" || code=="อบ" || code=="บห" {return false}
  n:=s.staff[c.NurseID]
  if sh.Double && !n.Double {return false}
  for _,a:=range n.Allowed {if a==code {return true}}

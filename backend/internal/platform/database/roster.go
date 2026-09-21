@@ -373,6 +373,12 @@ func loadRoster(ctx context.Context, q queryer, id int64) (domain.Roster, error)
 	if !hasShift("V") {
 		r.Shifts = append(r.Shifts, domain.RosterShift{Code: "V", Name: "ลาพักร้อน (Vacation)", Double: false, Periods: []domain.Period{}})
 	}
+	if !hasShift("อบ") {
+		r.Shifts = append(r.Shifts, domain.RosterShift{Code: "อบ", Name: "อบรม/ประชุมวิชาการ (8 ชม.)", Double: false, Periods: []domain.Period{{Start: 480, End: 960}}})
+	}
+	if !hasShift("บห") {
+		r.Shifts = append(r.Shifts, domain.RosterShift{Code: "บห", Name: "งานบริหาร/ภารกิจพิเศษ (8 ชม.)", Double: false, Periods: []domain.Period{{Start: 480, End: 960}}})
+	}
 	if len(r.Shifts) == 0 {
 		r.Shifts = []domain.RosterShift{
 			{Code: "ช", Name: "เช้า (08:00-16:00)", Double: false, Periods: []domain.Period{{Start: 480, End: 960}}},
@@ -386,6 +392,8 @@ func loadRoster(ctx context.Context, q queryer, id int64) (domain.Roster, error)
 			{Code: "X", Name: "OFF (วันหยุด)", Double: false, Periods: []domain.Period{}},
 			{Code: "L", Name: "ลา (Leave)", Double: false, Periods: []domain.Period{}},
 			{Code: "V", Name: "ลาพักร้อน (Vacation)", Double: false, Periods: []domain.Period{}},
+			{Code: "อบ", Name: "อบรม/ประชุมวิชาการ (8 ชม.)", Double: false, Periods: []domain.Period{{Start: 480, End: 960}}},
+			{Code: "บห", Name: "งานบริหาร/ภารกิจพิเศษ (8 ชม.)", Double: false, Periods: []domain.Period{{Start: 480, End: 960}}},
 		}
 	}
 	loc, e := time.LoadLocation(r.Timezone)

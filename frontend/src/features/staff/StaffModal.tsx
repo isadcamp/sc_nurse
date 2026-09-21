@@ -26,8 +26,16 @@ interface StaffModalProps {
   onStaffChanged: () => void;
 }
 
-const ALL_SHIFTS = ["ช", "บ", "ด", "ชบ", "บด", "Day", "Night", "D", "N", "X", "L"];
+const ALL_SHIFTS = ["ช", "บ", "ด", "ชบ", "บด", "อบ", "บห", "Day", "Night", "D", "N", "X", "L", "V"];
 const PAGE_SIZE = 10;
+
+function cleanShiftCodes(codes?: string[]): string[] {
+  if (!codes || codes.length === 0) return ALL_SHIFTS;
+  const filtered = codes.filter(
+    (s) => Boolean(s && s.trim() && !/^\?+$/.test(s.trim()) && !s.includes("\ufffd"))
+  );
+  return filtered.length > 0 ? filtered : ALL_SHIFTS;
+}
 
 export function StaffModal({
   open,
@@ -111,11 +119,7 @@ export function StaffModal({
     setFormIsActive(nurse.isActive);
     setFormIsPartTime(!!nurse.isPartTime);
     setFormSkills((nurse.skills || []).join(", "));
-    setFormAllowedShifts(
-      nurse.allowedShiftCodes && nurse.allowedShiftCodes.length > 0
-        ? nurse.allowedShiftCodes
-        : ALL_SHIFTS
-    );
+    setFormAllowedShifts(cleanShiftCodes(nurse.allowedShiftCodes));
     setError("");
     setNotice("");
   }

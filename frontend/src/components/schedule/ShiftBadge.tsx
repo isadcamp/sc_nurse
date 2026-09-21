@@ -30,6 +30,8 @@ export const SHIFT_CONFIGS: Record<string, { label: string; name: string; bg: st
   "Va": { label: "Va", name: "ลาพักผ่อน (Vacation)", bg: "bg-rose-100", text: "text-rose-950", border: "border-rose-300", icon: "🏖️" },
   "V": { label: "V", name: "ลาพักร้อน (8 ชม.)", bg: "bg-rose-100", text: "text-rose-950", border: "border-rose-300", icon: "🌴" },
   "v": { label: "V", name: "ลาพักร้อน (8 ชม.)", bg: "bg-rose-100", text: "text-rose-950", border: "border-rose-300", icon: "🌴" },
+  "อบ": { label: "อบ", name: "อบรม/ประชุมวิชาการ (8 ชม.)", bg: "bg-indigo-100", text: "text-indigo-950", border: "border-indigo-300", icon: "🎓" },
+  "บห": { label: "บห", name: "งานบริหาร/ภารกิจพิเศษ (8 ชม.)", bg: "bg-cyan-100", text: "text-cyan-950", border: "border-cyan-300", icon: "💼" },
 };
 
 export function ShiftBadge({

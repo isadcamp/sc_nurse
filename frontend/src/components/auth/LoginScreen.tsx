@@ -102,7 +102,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-500/30 text-white mb-4 border border-blue-400/30">
             <ShieldCheckIcon className="w-9 h-9" />
           </div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">เวร Easy</h1>
+          <h1 className="text-2xl font-black text-gray-800 tracking-tight">เวรEasy</h1>
           <p className="text-sm text-gray-500 mt-1">ระบบจัดตารางเวรและบริหารจัดการบุคลากรทางการพยาบาล</p>
         </div>
 

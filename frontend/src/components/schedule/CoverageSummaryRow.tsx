@@ -38,6 +38,7 @@ export interface CoverageItem {
 
 export function getShiftPeriodWeight(code: string, periodKey: string, shiftPeriods?: { start: number; end: number }[], periodWindow?: { start: number; end: number }): number {
   const c = code.trim();
+  if (c === "อบ" || c === "บห") return 0;
   if (periodKey === "morning") {
     // ช = COUNTIF("ช") + COUNTIF("ชบ") + COUNTIF("D") + COUNTIF("ชด")
     if (c === "ช" || c === "ชบ" || c === "ชด" || c === "D" || c === "Day" || c === "12D") return 1.0;
@@ -109,7 +110,7 @@ export function computeRosterDailyCoverage(roster: Roster | undefined, dates: st
   const dateAssignments: Record<string, { nurseId: string; code: string }[]> = {};
   for (const cell of roster.assignments || []) {
     const code = cell.shiftCode?.trim();
-    if (!code || code === "x" || code === "X" || code === "อ" || code === "L" || code === "Va" || code === "V" || code === "v") continue;
+    if (!code || code === "x" || code === "X" || code === "อ" || code === "L" || code === "Va" || code === "V" || code === "v" || code === "อบ" || code === "บห") continue;
     const st = staffMap[cell.nurseId];
     if (!st || !st.active) continue;
     if (!dateAssignments[cell.date]) dateAssignments[cell.date] = [];

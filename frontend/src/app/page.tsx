@@ -292,7 +292,7 @@ export default function Home() {
     }
 
     // OT Strict Guard: strictly prevent assigning over quota
-    if (newShift && newShift !== "x" && newShift !== "X" && newShift !== "อ" && newShift !== "L" && newShift !== "Va" && cell.shiftCode !== newShift) {
+    if (newShift && newShift !== "x" && newShift !== "X" && newShift !== "อ" && newShift !== "L" && newShift !== "Va" && newShift !== "V" && newShift !== "v" && newShift !== "อบ" && newShift !== "บห" && cell.shiftCode !== newShift) {
       const dateCov = dailyCoverage[cell.date];
       let isOverQuota = false;
       let shiftLabel = "";
@@ -608,7 +608,7 @@ const holidaySet = new Set<string>();
           } else if (code === "ชด") {
             totalHours += 16;
             eveNight += 1;
-          } else if (code === "L" || code === "Va" || code === "V" || code === "v") {
+          } else if (code === "L" || code === "Va" || code === "V" || code === "v" || code === "อบ" || code === "บห") {
             totalHours += 8;
           }
         }
@@ -685,7 +685,7 @@ const holidaySet = new Set<string>();
         <>
       <div className={`nf-shell ${showPrintModal ? "print-hidden" : ""} ${showLeftPanel ? "nav-expanded" : "nav-collapsed"}`}>
         <aside className="nf-sidebar no-print" aria-label="เมนูหลัก">
-          <div className="nf-brand"><BuildingOffice2Icon aria-hidden="true" /><div className="nav-label"><strong>NurseFlow <span>2.0</span></strong><p>ระบบบริหารและจัดตารางเวร</p></div></div>
+          <div className="nf-brand"><BuildingOffice2Icon aria-hidden="true" /><div className="nav-label"><strong>เวรEasy</strong><p>ระบบบริหารและจัดตารางเวร</p></div></div>
           <nav className="nf-menu" aria-label="พื้นที่ทำงาน">
             {[
               {label:"งานจัดตารางเวร", icon:ClipboardDocumentCheckIcon, key:"home" as const},
@@ -1630,7 +1630,7 @@ const holidaySet = new Set<string>();
         )}
       </div>
 
-        <footer className="nf-footer no-print"><span role="status">{saving ? "กำลังบันทึก… " : lastSaved ? `บันทึกแล้ว ${lastSaved} · ` : ""}{roster ? `ตารางประจำเดือน ${thaiMonthYear} · เจ้าหน้าที่ ${roster.staff.length} คน · ฉบับ v${roster.version}` : "เลือกหน่วยงานและเดือนเพื่อเริ่มต้น"}</span><span>NurseFlow 2.0</span></footer>
+        <footer className="nf-footer no-print"><span role="status">{saving ? "กำลังบันทึก… " : lastSaved ? `บันทึกแล้ว ${lastSaved} · ` : ""}{roster ? `ตารางประจำเดือน ${thaiMonthYear} · เจ้าหน้าที่ ${roster.staff.length} คน · ฉบับ v${roster.version}` : "เลือกหน่วยงานและเดือนเพื่อเริ่มต้น"}</span><span>เวรEasy</span></footer>
         </div>
       </div>
       {/* QUICK FLOATING SHIFT PICKER */}

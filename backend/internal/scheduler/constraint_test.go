@@ -1203,6 +1203,92 @@ func TestNightDeficitRelief_EveningToNightWhenNextDayIsOff(t *testing.T) {
 		shiftMapRes["rn-eve1@2026-10-05"], shiftMapRes["rn-eve2@2026-10-05"])
 }
 
+func TestPruneExcessMorningStaffing(t *testing.T) {
+	// Scenario: Morning staffing requirement is set to 6 people (1 Leader RN, 4 regular RNs, 1 PN).
+	// Initial roster has 9 people assigned to Morning (7 RNs, 2 PNs).
+	// System must prune excess morning shifts down to exactly 6 people (5 RNs including leader, 1 PN) and convert 3 to OFF (X).
+	r := domain.Roster{
+		Month: 10,
+		Year:  2026,
+		Policy: domain.Policy{
+			Staffing: []domain.Staffing{
+				{Date: "2026-10-05", Start: 480, End: 960, RN: 4, Leaders: 1, PN: 1}, // Target = 5 RNs + 1 PN = 6 total
+			},
+			MinRestHours: 8,
+		},
+		Staff: []domain.Staff{
+			{ID: "rn-lead", Active: true, Position: "RN", Leader: true, Allowed: []string{"ช", "X"}},
+			{ID: "rn-1", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			{ID: "rn-2", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			{ID: "rn-3", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			{ID: "rn-4", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			{ID: "rn-5", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			{ID: "rn-6", Active: true, Position: "RN", Allowed: []string{"ช", "X"}},
+			{ID: "pn-1", Active: true, Position: "PN", Allowed: []string{"ช", "X"}},
+			{ID: "pn-2", Active: true, Position: "PN", Allowed: []string{"ช", "X"}},
+		},
+		Shifts: []domain.RosterShift{
+			{Code: "ช", Periods: []domain.Period{{Start: 480, End: 960}}},
+			{Code: "X", Periods: []domain.Period{}},
+		},
+	}
+
+	dateD := "2026-10-05"
+	cells := []domain.Cell{
+		{NurseID: "rn-lead", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "rn-1", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "rn-2", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "rn-3", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "rn-4", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "rn-5", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "rn-6", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "pn-1", Date: dateD, ShiftCode: "ช"},
+		{NurseID: "pn-2", Date: dateD, ShiftCode: "ช"},
+	}
+
+	pruned := pruneExcessDoubles(r, cells)
+
+	rnCount := 0
+	leaderCount := 0
+	pnCount := 0
+	offCount := 0
+
+	for _, c := range pruned {
+		if c.Date != dateD {
+			continue
+		}
+		if c.ShiftCode == "ช" {
+			if c.NurseID == "rn-lead" {
+				leaderCount++
+				rnCount++
+			} else if c.NurseID == "pn-1" || c.NurseID == "pn-2" {
+				pnCount++
+			} else {
+				rnCount++
+			}
+		} else if c.ShiftCode == "X" {
+			offCount++
+		}
+	}
+
+	if rnCount != 5 {
+		t.Errorf("expected exactly 5 RNs on Morning, got %d", rnCount)
+	}
+	if leaderCount != 1 {
+		t.Errorf("expected leader to be preserved on Morning, got %d", leaderCount)
+	}
+	if pnCount != 1 {
+		t.Errorf("expected exactly 1 PN on Morning, got %d", pnCount)
+	}
+	if rnCount+pnCount != 6 {
+		t.Errorf("expected total 6 people on Morning (set target = 6), got %d", rnCount+pnCount)
+	}
+	if offCount != 3 {
+		t.Errorf("expected 3 excess nurses pruned to OFF (X), got %d", offCount)
+	}
+}
+
+
 
 
 

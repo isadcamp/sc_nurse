@@ -25,8 +25,16 @@ interface StaffPanelProps {
   onBackToGrid: () => void;
 }
 
-const ALL_SHIFTS = ["ช", "บ", "ด", "ชบ", "บด", "Day", "Night", "D", "N", "X", "L", "V"];
+const ALL_SHIFTS = ["ช", "บ", "ด", "ชบ", "บด", "อบ", "บห", "Day", "Night", "D", "N", "X", "L", "V"];
 const PAGE_SIZE = 12;
+
+function cleanShiftCodes(codes?: string[]): string[] {
+  if (!codes || codes.length === 0) return ALL_SHIFTS;
+  const filtered = codes.filter(
+    (s) => Boolean(s && s.trim() && !/^\?+$/.test(s.trim()) && !s.includes("\ufffd"))
+  );
+  return filtered.length > 0 ? filtered : ALL_SHIFTS;
+}
 
 export function StaffPanel({
   wardId,
@@ -109,11 +117,7 @@ export function StaffPanel({
     setFormIsActive(nurse.isActive);
     setFormIsPartTime(!!nurse.isPartTime);
     setFormSkills((nurse.skills || []).join(", "));
-    setFormAllowedShifts(
-      nurse.allowedShiftCodes && nurse.allowedShiftCodes.length > 0
-        ? nurse.allowedShiftCodes
-        : ALL_SHIFTS
-    );
+    setFormAllowedShifts(cleanShiftCodes(nurse.allowedShiftCodes));
     setError("");
     setNotice("");
   }
@@ -678,12 +682,8 @@ export function StaffPanel({
                           </td>
                           <td className="py-3 px-3">
                             <div className="flex flex-wrap gap-1">
-                              {(nurse.allowedShiftCodes && nurse.allowedShiftCodes.length > 0
-                                ? nurse.allowedShiftCodes
-                                : ALL_SHIFTS
-                              )
-                                .filter((s) => s !== "X" && s !== "L")
-                                .slice(0, 5)
+                              {cleanShiftCodes(nurse.allowedShiftCodes)
+                                .filter((s) => s !== "X" && s !== "x" && s !== "L")
                                 .map((s, sIdx) => (
                                   <span key={`${s}_${sIdx}`} className="px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] font-bold">
                                     {s}

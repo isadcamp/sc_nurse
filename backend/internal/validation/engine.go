@@ -98,7 +98,8 @@ func Validate(r domain.Roster, original []domain.Cell) domain.Report {
 		n, ok := staff[c.NurseID]
 		sh, valid := shifts[c.ShiftCode]
 		if inMonth {
-			isLeaveOrOff := c.ShiftCode == "X" || c.ShiftCode == "x" || c.ShiftCode == "อ" || c.ShiftCode == "L" || c.ShiftCode == "V" || c.ShiftCode == "v" || c.ShiftCode == "Va"
+			isSpecialDuty := c.ShiftCode == "อบ" || c.ShiftCode == "บห"
+			isLeaveOrOff := c.ShiftCode == "X" || c.ShiftCode == "x" || c.ShiftCode == "อ" || c.ShiftCode == "L" || c.ShiftCode == "V" || c.ShiftCode == "v" || c.ShiftCode == "Va" || isSpecialDuty
 			if !ok || !n.Active || (c.ShiftCode != "" && !isLeaveOrOff && (!valid || !contains(n.Allowed, c.ShiftCode))) {
 				add("STAFF_PERMISSION", "error", c, "บุคลากรไม่มีสิทธิ์ในเวรนี้หรือข้อมูลเวรไม่ครบ", nil)
 			}
@@ -420,6 +421,9 @@ func Validate(r domain.Roster, original []domain.Cell) domain.Report {
 				for id, list := range periods {
 					covered := false
 					for _, v := range list {
+						if v.cell.ShiftCode == "อบ" || v.cell.ShiftCode == "บห" {
+							continue
+						}
 						if !v.start.After(points[i]) && !v.end.Before(points[i+1]) {
 							covered = true
 							break

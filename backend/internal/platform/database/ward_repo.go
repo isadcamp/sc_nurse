@@ -75,6 +75,8 @@ func (r *WardRepository) InitWardDefaults(ctx context.Context, wardID domain.War
 		{"X", "OFF (วันหยุด)", `[]`, 0, false, true},
 		{"L", "ลา (Leave)", `[]`, 0, false, true},
 		{"V", "ลาพักร้อน (Vacation)", `[]`, 8, false, true},
+		{"อบ", "อบรม/ประชุมวิชาการ (08:00-16:00)", `[{"start":480,"end":960}]`, 8, false, false},
+		{"บห", "งานบริหาร/ภารกิจพิเศษ (08:00-16:00)", `[{"start":480,"end":960}]`, 8, false, false},
 	}
 	for i, s := range shifts {
 		id := fmt.Sprintf("%s-st-%d", w, i+1)

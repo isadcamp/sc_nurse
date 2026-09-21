@@ -30,6 +30,8 @@ export function NurseStatsColumn({
   let evening = 0;
   let night = 0;
   let leave = 0;
+  let specialDuty = 0;
+  let dayOff = 0;
   let actualWorkHours = 0;
   let calculatedEveNightShifts = 0;
 
@@ -38,6 +40,9 @@ export function NurseStatsColumn({
       const code = a.shiftCode?.trim();
       if (code === "ช") {
         morning++;
+        actualWorkHours += 8;
+      } else if (code === "อบ" || code === "บห") {
+        specialDuty++;
         actualWorkHours += 8;
       } else if (code === "Day" || code === "D") {
         morning++;
@@ -73,7 +78,7 @@ export function NurseStatsColumn({
         actualWorkHours += 16;
         calculatedEveNightShifts += 1.0;
       } else if (code === "อ" || code === "X" || code === "x") {
-        // Day off
+        dayOff++;
       } else if (code === "L" || code === "Va" || code === "V" || code === "v") {
         leave++;
       }
@@ -124,6 +129,16 @@ export function NurseStatsColumn({
             <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-900 font-bold" title="เวรดึก / Night 12h">
               ด:{night}
             </span>
+            {specialDuty > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-950 font-bold" title="อบรม/บริหาร (8 ชม.)">
+                อบ/บห:{specialDuty}
+              </span>
+            )}
+            {dayOff > 0 && (
+              <span className="px-1.5 py-0.5 rounded bg-slate-200 text-slate-800 font-bold" title={`วันหยุดประจำ (OFF) ${dayOff} วัน`}>
+                x:{dayOff}
+              </span>
+            )}
             {leave > 0 && (
               <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-900 font-bold" title={`วันลา (${leaveCreditHours} ชม. เครดิต)`}>
                 L:{leave}

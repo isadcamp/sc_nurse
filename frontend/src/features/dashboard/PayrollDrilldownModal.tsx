@@ -101,6 +101,14 @@ export function PayrollDrilldownModal({
         morningCount++;
         shiftLabel = "เช้า (08:00-16:00)";
         shiftColor = "text-amber-800 bg-amber-50 border-amber-200";
+      } else if (code === "อบ") {
+        workHours = 8;
+        shiftLabel = "อบรม/ประชุมวิชาการ (8 ชม.)";
+        shiftColor = "text-indigo-950 bg-indigo-100 border-indigo-300";
+      } else if (code === "บห") {
+        workHours = 8;
+        shiftLabel = "งานบริหาร/ภารกิจพิเศษ (8 ชม.)";
+        shiftColor = "text-cyan-950 bg-cyan-100 border-cyan-300";
       } else if (code === "Day" || code === "D") {
         workHours = 12;
         eveNightUnit = 0.5;
@@ -376,7 +384,7 @@ export function PayrollDrilldownModal({
             การรับรองความถูกต้องของข้อมูล (Audit & Certification)
           </div>
           <p className="text-[11px] leading-relaxed">
-            รายการคำนวณนี้ออกโดยระบบ <strong>NurseFlow Payroll Engine</strong> คำนวณตามระเบียบโรงพยาบาล:
+            รายการคำนวณนี้ออกโดยระบบ <strong>เวรEasy Payroll Engine</strong> คำนวณตามระเบียบโรงพยาบาล:
             ฐานทำงาน {workingDays} วันทำการ ({statement.standardHours} ชม.), อัตราค่าเวรบ่ายดึก {eveRate} ฿/หน่วย (เพดาน {allowanceCap > 0 ? `${allowanceCap} วัน` : "ไม่จำกัด"}), และอัตราค่าล่วงเวลา OT {otHourlyRate} ฿/ชม. (~{(otHourlyRate * 8).toLocaleString()} ฿/เวร 8 ชม.)
           </p>
         </div>

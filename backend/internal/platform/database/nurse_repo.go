@@ -5,11 +5,31 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"nurse-scheduler/backend/internal/domain"
 )
 
 type NurseRepository struct {
 	db *sql.DB
+}
+
+func sanitizeShiftCodes(shifts []string) []string {
+	valid := []string{}
+	seen := map[string]bool{}
+	for _, s := range shifts {
+		s = strings.TrimSpace(s)
+		if s == "" || strings.Trim(s, "?") == "" || strings.Contains(s, "\ufffd") {
+			continue
+		}
+		if !seen[s] {
+			seen[s] = true
+			valid = append(valid, s)
+		}
+	}
+	if len(valid) == 0 {
+		return []string{"ช", "บ", "ด", "ชบ", "บด", "อบ", "บห", "Day", "Night", "X", "L", "V"}
+	}
+	return valid
 }
 
 func NewNurseRepository(db *sql.DB) *NurseRepository {
@@ -37,9 +57,7 @@ func (r *NurseRepository) FindByID(ctx context.Context, id domain.NurseID) (doma
 	if len(allowedBytes) > 0 {
 		_ = json.Unmarshal(allowedBytes, &n.AllowedShiftCodes)
 	}
-	if n.AllowedShiftCodes == nil {
-		n.AllowedShiftCodes = []string{}
-	}
+	n.AllowedShiftCodes = sanitizeShiftCodes(n.AllowedShiftCodes)
 	return n, nil
 }
 
@@ -72,9 +90,7 @@ func (r *NurseRepository) FindByWard(ctx context.Context, wardID domain.WardID, 
 		if len(allowedBytes) > 0 {
 			_ = json.Unmarshal(allowedBytes, &n.AllowedShiftCodes)
 		}
-		if n.AllowedShiftCodes == nil {
-			n.AllowedShiftCodes = []string{}
-		}
+		n.AllowedShiftCodes = sanitizeShiftCodes(n.AllowedShiftCodes)
 		result = append(result, n)
 	}
 	return result, rows.Err()
@@ -88,9 +104,7 @@ func (r *NurseRepository) Save(ctx context.Context, nurse domain.Nurse) error {
 	if nurse.Skills == nil {
 		nurse.Skills = []string{}
 	}
-	if nurse.AllowedShiftCodes == nil {
-		nurse.AllowedShiftCodes = []string{}
-	}
+	nurse.AllowedShiftCodes = sanitizeShiftCodes(nurse.AllowedShiftCodes)
 	skillsJSON, err := json.Marshal(nurse.Skills)
 	if err != nil {
 		return fmt.Errorf("marshal skills: %w", err)
@@ -114,9 +128,7 @@ func (r *NurseRepository) Update(ctx context.Context, nurse domain.Nurse) error 
 	if nurse.Skills == nil {
 		nurse.Skills = []string{}
 	}
-	if nurse.AllowedShiftCodes == nil {
-		nurse.AllowedShiftCodes = []string{}
-	}
+	nurse.AllowedShiftCodes = sanitizeShiftCodes(nurse.AllowedShiftCodes)
 	skillsJSON, err := json.Marshal(nurse.Skills)
 	if err != nil {
 		return fmt.Errorf("marshal skills: %w", err)

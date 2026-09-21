@@ -179,7 +179,7 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 			}
 			choices := []string{}
 			for _, sh := range r.Shifts {
-				if sh.Code == "บด" {
+				if sh.Code == "บด" || sh.Code == "อบ" || sh.Code == "บห" {
 					continue
 				}
 				allowed := sh.Code == "X" || sh.Code == "L"
@@ -2797,8 +2797,123 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 				currentNightPN -= 1.0
 			}
 		}
+
+		// 4. Trim excess RNs and PNs in Morning (08:00 - 16:00) if exceeding required staffing:
+		mornReqRN, mornReqLeaders, mornReqPN := 0, 0, 0
+		for _, ar := range activeStaffing {
+			if ar.Start >= 480 && ar.End <= 960 {
+				mornReqRN += ar.RN
+				mornReqLeaders += ar.Leaders
+				mornReqPN += ar.PN
+			}
+		}
+		totalMornReqRN := mornReqRN + mornReqLeaders
+		totalMornReqRNFloat := float64(totalMornReqRN)
+		mornReqPNFloat := float64(mornReqPN)
+		mornReqLeadersFloat := float64(mornReqLeaders)
+
+		currentMornRN := 0.0
+		currentMornLeaders := 0.0
+		currentMornPN := 0.0
+
+		for _, idx := range indices {
+			c := out[idx]
+			if c.ShiftCode == "" || c.ShiftCode == "X" || c.ShiftCode == "x" || c.ShiftCode == "L" || c.ShiftCode == "V" || c.ShiftCode == "v" || c.ShiftCode == "Va" {
+				continue
+			}
+			code := strings.TrimSpace(c.ShiftCode)
+			weight := 0.0
+			if code == "ช" || code == "ชบ" || code == "ชด" {
+				weight = 1.0
+			} else if code == "D" || code == "Day" || code == "12D" {
+				weight = 1.0
+			}
+			if weight > 0 {
+				nurse, exists := staffMap[c.NurseID]
+				if exists && nurse.Active {
+					if nurse.Position == "RN" {
+						currentMornRN += weight
+						if nurse.Leader {
+							currentMornLeaders += weight
+						}
+					} else if nurse.Position == "PN" {
+						currentMornPN += weight
+					}
+				}
+			}
+		}
+
+		// 4.1 Trim excess RNs on Morning: downgrade unlocked "ช" -> "X"
+		if totalMornReqRNFloat > 0 && currentMornRN > totalMornReqRNFloat+0.001 {
+			// Pass 1: Non-leader RNs on "ช" -> "X"
+			for _, idx := range indices {
+				if currentMornRN <= totalMornReqRNFloat+0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "ช" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "RN" || nurse.Leader {
+					continue
+				}
+				if !isSafeTransition(c.NurseID, date, "X") {
+					continue
+				}
+				out[idx].ShiftCode = "X"
+				currentMornRN -= 1.0
+			}
+
+			// Pass 2: Leader RNs on "ช" -> "X" (only if remaining morning leaders >= mornReqLeaders)
+			minMornLeadersRequired := math.Max(1.0, mornReqLeadersFloat)
+			for _, idx := range indices {
+				if currentMornRN <= totalMornReqRNFloat+0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "ช" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "RN" || !nurse.Leader {
+					continue
+				}
+				if currentMornLeaders > minMornLeadersRequired+0.001 {
+					if !isSafeTransition(c.NurseID, date, "X") {
+						continue
+					}
+					out[idx].ShiftCode = "X"
+					currentMornRN -= 1.0
+					currentMornLeaders -= 1.0
+				}
+			}
+		}
+
+		// 4.2 Trim excess PNs on Morning: downgrade unlocked "ช" -> "X"
+		if mornReqPNFloat > 0 && currentMornPN > mornReqPNFloat+0.001 {
+			for _, idx := range indices {
+				if currentMornPN <= mornReqPNFloat+0.001 {
+					break
+				}
+				c := out[idx]
+				if c.Locked || c.ShiftCode != "ช" {
+					continue
+				}
+				nurse, exists := staffMap[c.NurseID]
+				if !exists || !nurse.Active || nurse.Position != "PN" {
+					continue
+				}
+				if !isSafeTransition(c.NurseID, date, "X") {
+					continue
+				}
+				out[idx].ShiftCode = "X"
+				currentMornPN -= 1.0
+			}
+		}
 	}
 
 	return out
 }
+
 

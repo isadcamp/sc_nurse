@@ -6,7 +6,7 @@ import "@fontsource/noto-sans-thai/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NurseFlow | จัดตารางเวรพยาบาล",
+  title: "เวรEasy | ระบบบริหารและจัดตารางเวรพยาบาล",
   description: "ระบบจัดตารางเวรพยาบาลอัตโนมัติ",
 };
 
