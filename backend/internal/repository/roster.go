@@ -26,6 +26,7 @@ type RosterStore interface {
 	ListPayrollOverrides(ctx context.Context, scheduleID int64) ([]domain.PayrollOverride, error)
 	SavePayrollOverride(ctx context.Context, o domain.PayrollOverride, a domain.Audit) (domain.PayrollOverride, error)
 	DeletePayrollOverride(ctx context.Context, overrideID int64, a domain.Audit) error
+	Delete(ctx context.Context, id int64, a domain.Audit) error
 	ListCompensationRates(ctx context.Context) ([]domain.CompensationRate, error)
 	SaveCompensationRate(ctx context.Context, r domain.CompensationRate) (domain.CompensationRate, error)
 }

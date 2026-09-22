@@ -132,4 +132,25 @@ func TestWorkflowTransitions(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 on create payroll override, got %d: %s", w.Code, w.Body.String())
 	}
+
+	// 16. Unpublish without valid reason (< 5 chars) should fail
+	w = call(h, "POST", "/api/v1/schedules/1/unpublish", `{"reason":"แก้"}`, headToken)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 when unpublishing without 5 chars reason, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 17. Unpublish with valid reason -> returns to draft
+	w = call(h, "POST", "/api/v1/schedules/1/unpublish", `{"reason":"พยาบาลลาคลอดกะทันหัน ต้องจัดเวรใหม่"}`, headToken)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 on unpublish, got %d: %s", w.Code, w.Body.String())
+	}
+	if m.R.Status != "draft" {
+		t.Fatalf("expected status draft after unpublish, got %s", m.R.Status)
+	}
+
+	// 18. Delete draft schedule
+	w = call(h, "DELETE", "/api/v1/schedules/1", "", headToken)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 on delete draft schedule, got %d: %s", w.Code, w.Body.String())
+	}
 }

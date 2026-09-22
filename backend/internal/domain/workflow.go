@@ -16,7 +16,7 @@ var validTransitions = map[string][]string{
 	StatusGenerated:   {StatusUnderReview},
 	StatusUnderReview: {StatusApproved, StatusGenerated},
 	StatusApproved:    {StatusPublished},
-	StatusPublished:   {StatusClosed},
+	StatusPublished:   {StatusClosed, StatusDraft},
 	StatusClosed:      {StatusPublished}, // Re-open allows moving back to published
 }
 
@@ -39,6 +39,8 @@ func ValidTransition(from, to string) bool {
 // TransitionAction returns the audit action name for a status change.
 func TransitionAction(to string) string {
 	switch to {
+	case StatusDraft:
+		return "unpublish"
 	case StatusGenerated:
 		return "generate"
 	case StatusUnderReview:

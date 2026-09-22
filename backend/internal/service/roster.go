@@ -8,6 +8,7 @@ import (
 	"nurse-scheduler/backend/internal/validation"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type Edit struct {
@@ -207,6 +208,44 @@ func (s *RosterService) Revise(ctx context.Context, id int64, a domain.Actor, re
 }
 func (s *RosterService) Publish(ctx context.Context, id int64, a domain.Actor) error {
 	return s.transition(ctx, id, a, domain.StatusPublished, map[string]string{"published_by": a.ID})
+}
+func (s *RosterService) Unpublish(ctx context.Context, id int64, a domain.Actor, reason string) error {
+	if utf8.RuneCountInString(strings.TrimSpace(reason)) < 5 {
+		return repository.ErrInput
+	}
+	r, e := s.Get(ctx, id, a)
+	if e != nil {
+		return e
+	}
+	if !Allowed(a, r.WardID, true) {
+		return repository.ErrForbidden
+	}
+	if r.Status != domain.StatusPublished {
+		return repository.ErrConflict
+	}
+	return s.Store.UpdateStatus(ctx, id, domain.StatusDraft, map[string]string{
+		"published_by": "",
+		"published_at": "",
+	}, domain.Audit{
+		Actor:  a.ID,
+		Action: "unpublish",
+		Reason: reason,
+		At:     time.Now().UTC(),
+	})
+}
+func (s *RosterService) Delete(ctx context.Context, id int64, a domain.Actor) error {
+	r, e := s.Get(ctx, id, a)
+	if e != nil {
+		return e
+	}
+	if !Allowed(a, r.WardID, true) {
+		return repository.ErrForbidden
+	}
+	return s.Store.Delete(ctx, id, domain.Audit{
+		Actor:  a.ID,
+		Action: "delete",
+		At:     time.Now().UTC(),
+	})
 }
 func (s *RosterService) Close(ctx context.Context, id int64, a domain.Actor) error {
 	return s.transition(ctx, id, a, domain.StatusClosed, map[string]string{"closed_by": a.ID})

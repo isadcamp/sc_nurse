@@ -65,11 +65,11 @@ func (m *Memory) List(_ context.Context, w string, month, year int) ([]domain.Ro
 	m.init()
 	out := []domain.Roster{}
 	for _, r := range m.Rosters {
-		if w == r.WardID && month == r.Month && year == r.Year {
+		if w == r.WardID && (month <= 0 || month == r.Month) && (year <= 0 || year == r.Year) {
 			out = append(out, Clone(r))
 		}
 	}
-	if len(out) == 0 && w == m.R.WardID && month == m.R.Month && year == m.R.Year {
+	if len(out) == 0 && w == m.R.WardID && (month <= 0 || month == m.R.Month) && (year <= 0 || year == m.R.Year) {
 		out = append(out, Clone(m.R))
 	}
 	return out, nil
@@ -220,6 +220,24 @@ func (m *Memory) ListVersions(_ context.Context, wardID string, month, year int)
 		}
 	}
 	return out, nil
+}
+func (m *Memory) Delete(_ context.Context, id int64, a domain.Audit) error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+	m.init()
+	r, exists := m.Rosters[id]
+	if !exists {
+		if id == m.R.ID {
+			r = m.R
+		} else {
+			return repository.ErrNotFound
+		}
+	}
+	if r.Status != domain.StatusDraft && r.Status != domain.StatusGenerated {
+		return repository.ErrConflict
+	}
+	delete(m.Rosters, id)
+	return nil
 }
 func (m *Memory) GetAuditLog(_ context.Context, scheduleID int64) ([]domain.AuditEntry, error) {
 	m.Mu.Lock()

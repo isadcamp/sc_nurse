@@ -43,7 +43,19 @@ func (s *RosterStore) Get(ctx context.Context, id int64) (domain.Roster, error) 
 	return r, tx.Commit()
 }
 func (s *RosterStore) List(ctx context.Context, w string, m, y int) ([]domain.Roster, error) {
-	rows, e := s.DB.QueryContext(ctx, "SELECT id,ward_id,month,year,status,version FROM schedules WHERE ward_id=? AND month=? AND year=? ORDER BY (status = 'published') DESC, version DESC, id DESC", w, m, y)
+	var query string
+	var args []any
+	if m > 0 && y > 0 {
+		query = "SELECT s.id,s.ward_id,s.month,s.year,s.status,s.version,s.published_by,s.published_at FROM schedules s WHERE s.ward_id=? AND s.month=? AND s.year=? ORDER BY (s.status = 'published') DESC, s.version DESC, s.id DESC"
+		args = []any{w, m, y}
+	} else if y > 0 {
+		query = "SELECT s.id,s.ward_id,s.month,s.year,s.status,s.version,s.published_by,s.published_at FROM schedules s WHERE s.ward_id=? AND s.year=? ORDER BY s.month ASC, (s.status = 'published') DESC, s.version DESC, s.id DESC"
+		args = []any{w, y}
+	} else {
+		query = "SELECT s.id,s.ward_id,s.month,s.year,s.status,s.version,s.published_by,s.published_at FROM schedules s WHERE s.ward_id=? ORDER BY s.year DESC, s.month ASC, (s.status = 'published') DESC, s.version DESC, s.id DESC"
+		args = []any{w}
+	}
+	rows, e := s.DB.QueryContext(ctx, query, args...)
 	if e != nil {
 		return nil, e
 	}
@@ -51,8 +63,16 @@ func (s *RosterStore) List(ctx context.Context, w string, m, y int) ([]domain.Ro
 	out := []domain.Roster{}
 	for rows.Next() {
 		var r domain.Roster
-		if e = rows.Scan(&r.ID, &r.WardID, &r.Month, &r.Year, &r.Status, &r.Version); e != nil {
+		var publishedBy sql.NullString
+		var publishedAt sql.NullTime
+		if e = rows.Scan(&r.ID, &r.WardID, &r.Month, &r.Year, &r.Status, &r.Version, &publishedBy, &publishedAt); e != nil {
 			return nil, e
+		}
+		if publishedBy.Valid {
+			r.PublishedBy = publishedBy.String
+		}
+		if publishedAt.Valid {
+			r.PublishedAt = publishedAt.Time.UTC().Format(time.RFC3339)
 		}
 		out = append(out, r)
 	}

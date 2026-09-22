@@ -3,6 +3,8 @@ package httpapi
 import (
 	"net/http"
 	"nurse-scheduler/backend/internal/domain"
+	"strings"
+	"unicode/utf8"
 )
 
 func (a *API) submitReview(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +85,45 @@ func (a *API) publishSchedule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rosterResult(w, 200, out)
+}
+
+func (a *API) unpublishSchedule(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Reason string `json:"reason"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if utf8.RuneCountInString(strings.TrimSpace(in.Reason)) < 5 {
+		writeError(w, 422, "invalid_input", "กรุณาระบุเหตุผลการยกเลิกอย่างน้อย 5 ตัวอักษร")
+		return
+	}
+	if e := a.services.Roster.Unpublish(r.Context(), id, actor(r), in.Reason); e != nil {
+		fail(w, e)
+		return
+	}
+	out, e := a.services.Roster.Get(r.Context(), id, actor(r))
+	if e != nil {
+		fail(w, e)
+		return
+	}
+	rosterResult(w, 200, out)
+}
+
+func (a *API) deleteSchedule(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	if e := a.services.Roster.Delete(r.Context(), id, actor(r)); e != nil {
+		fail(w, e)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"status": "ok", "deletedId": id})
 }
 
 func (a *API) newVersion(w http.ResponseWriter, r *http.Request) {

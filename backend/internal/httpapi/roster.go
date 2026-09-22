@@ -130,6 +130,8 @@ func (a *API) rosterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/schedules/{id}/approve", a.approveSchedule)
 	mux.HandleFunc("POST /api/v1/schedules/{id}/revise", a.reviseSchedule)
 	mux.HandleFunc("POST /api/v1/schedules/{id}/publish", a.publishSchedule)
+	mux.HandleFunc("POST /api/v1/schedules/{id}/unpublish", a.unpublishSchedule)
+	mux.HandleFunc("DELETE /api/v1/schedules/{id}", a.deleteSchedule)
 	mux.HandleFunc("POST /api/v1/schedules/{id}/close", a.closeSchedule)
 	mux.HandleFunc("POST /api/v1/schedules/{id}/reopen", a.reopenSchedule)
 	mux.HandleFunc("GET /api/v1/schedules/{id}/payroll-overrides", a.listPayrollOverrides)
@@ -157,7 +159,16 @@ func (a *API) listRosters(w http.ResponseWriter, r *http.Request) {
 	}
 	data := make([]map[string]any, 0, len(out))
 	for _, item := range out {
-		data = append(data, map[string]any{"id": item.ID, "wardId": item.WardID, "month": item.Month, "year": item.Year, "status": item.Status, "version": item.Version})
+		data = append(data, map[string]any{
+			"id":          item.ID,
+			"wardId":      item.WardID,
+			"month":       item.Month,
+			"year":        item.Year,
+			"status":      item.Status,
+			"version":     item.Version,
+			"publishedBy": item.PublishedBy,
+			"publishedAt": item.PublishedAt,
+		})
 	}
 	writeJSON(w, 200, map[string]any{"data": data})
 }
