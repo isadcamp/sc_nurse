@@ -35,6 +35,7 @@ interface AnnualOverviewPanelProps {
   isHead: boolean;
   onOpenSchedule: (monthStr: string, scheduleId?: number) => void;
   onStartSchedule: (monthStr: string) => void;
+  onCreateBlankSchedule: (monthStr: string) => Promise<void>;
   onPrintSchedule: (monthStr: string, scheduleId: number) => void;
   onUnpublish: (scheduleId: number) => void;
 }
@@ -52,6 +53,7 @@ export function AnnualOverviewPanel({
   isHead,
   onOpenSchedule,
   onStartSchedule,
+  onCreateBlankSchedule,
   onPrintSchedule,
   onUnpublish,
 }: AnnualOverviewPanelProps) {
@@ -63,17 +65,24 @@ export function AnnualOverviewPanel({
   const [schedules, setSchedules] = useState<ScheduleYearSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [creatingMonth, setCreatingMonth] = useState<string | null>(null);
 
   const loadYearSchedules = useCallback(async (year: number) => {
     if (!token || !wardId) return;
     setLoading(true);
     setError("");
     try {
-      const data = await request<{ data: ScheduleYearSummary[] }>(
-        `/wards/${encodeURIComponent(wardId)}/schedules?year=${year}`,
-        token
+      const monthlyResults = await Promise.all(
+        Array.from({ length: 12 }, async (_, index) => {
+          const month = index + 1;
+          const data = await request<{ data: ScheduleYearSummary[] }>(
+            `/wards/${encodeURIComponent(wardId)}/schedules?month=${month}&year=${year}`,
+            token
+          );
+          return data.data || [];
+        })
       );
-      setSchedules(data.data || []);
+      setSchedules(monthlyResults.flat());
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการโหลดข้อมูลตารางเวร");
     } finally {
@@ -82,7 +91,7 @@ export function AnnualOverviewPanel({
   }, [token, wardId]);
 
   useEffect(() => {
-    void loadYearSchedules(selectedYear);
+    queueMicrotask(() => { void loadYearSchedules(selectedYear); });
   }, [selectedYear, loadYearSchedules]);
 
   // Compute month stats
@@ -99,12 +108,12 @@ export function AnnualOverviewPanel({
       });
 
       const published = monthSchedules.find((s) => s.status === "published");
+      const closed = monthSchedules.find((s) => s.status === "closed");
       const approved = monthSchedules.find((s) => s.status === "approved");
       const underReview = monthSchedules.find((s) => s.status === "under_review");
-      const closed = monthSchedules.find((s) => s.status === "closed");
-      const latestDraft = monthSchedules[0];
+      const latestDraft = monthSchedules.find((s) => s.status === "draft" || s.status === "generated");
 
-      let mainSchedule = published || approved || underReview || closed || latestDraft;
+      const mainSchedule = published || closed || approved || underReview || latestDraft || monthSchedules[0];
 
       const isCurrentMonth = selectedYear === currentRealYear && monthNum === currentRealMonth;
       const monthCode = `${selectedYear}-${String(monthNum).padStart(2, "0")}`;
@@ -118,7 +127,7 @@ export function AnnualOverviewPanel({
         publishedSchedule: published,
         mainSchedule,
         hasPublished: !!published,
-        hasDraft: monthSchedules.length > 0 && !published,
+        hasDraft: Boolean((approved || underReview || latestDraft) && !published && !closed),
         isEmpty: monthSchedules.length === 0,
         isClosed: !!closed && !published,
       };
@@ -399,14 +408,27 @@ export function AnnualOverviewPanel({
                     <span>ดูข้อมูลย้อนหลัง</span>
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => onStartSchedule(m.monthCode)}
-                    className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-200 hover:border-blue-600 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                  >
-                    <PlusIcon className="w-3.5 h-3.5" />
-                    <span>+ เริ่มจัดเวรเดือนนี้</span>
-                  </button>
+                  isHead ? (
+                    <button
+                      type="button"
+                      disabled={creatingMonth === m.monthCode}
+                      onClick={async () => {
+                        setCreatingMonth(m.monthCode);
+                        try {
+                          await onCreateBlankSchedule(m.monthCode);
+                          await loadYearSchedules(selectedYear);
+                        } finally {
+                          setCreatingMonth(null);
+                        }
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-200 hover:border-blue-600 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-60 disabled:cursor-wait"
+                    >
+                      {creatingMonth === m.monthCode ? <ArrowPathIcon className="w-3.5 h-3.5 animate-spin" /> : <PlusIcon className="w-3.5 h-3.5" />}
+                      <span>{creatingMonth === m.monthCode ? "กำลังสร้างตารางเปล่า..." : "สร้างตารางเปล่า"}</span>
+                    </button>
+                  ) : (
+                    <span className="w-full py-2 px-3 text-center text-xs font-semibold text-slate-400">รอหัวหน้าสร้างตาราง</span>
+                  )
                 )}
               </div>
             </div>
@@ -416,3 +438,5 @@ export function AnnualOverviewPanel({
     </div>
   );
 }
+
+
