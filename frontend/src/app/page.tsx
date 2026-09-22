@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { CalendarDaysIcon, UsersIcon, CalendarIcon, Cog6ToothIcon, ChartBarIcon, SparklesIcon, ArrowLeftOnRectangleIcon, Bars3Icon, PlusIcon, PrinterIcon, ExclamationTriangleIcon, InformationCircleIcon, MagnifyingGlassIcon, XMarkIcon, ClipboardDocumentCheckIcon, BuildingOffice2Icon, ArrowPathIcon, CheckCircleIcon, ShieldCheckIcon, BackspaceIcon, BanknotesIcon } from "@heroicons/react/24/outline";
+import { CalendarDaysIcon, UsersIcon, CalendarIcon, Cog6ToothIcon, ChartBarIcon, SparklesIcon, ArrowLeftOnRectangleIcon, Bars3Icon, PlusIcon, PrinterIcon, ExclamationTriangleIcon, InformationCircleIcon, MagnifyingGlassIcon, XMarkIcon, ClipboardDocumentCheckIcon, BuildingOffice2Icon, ArrowPathIcon, CheckCircleIcon, ShieldCheckIcon, BackspaceIcon, BanknotesIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { ModalFrame } from "@/components/ui/ModalFrame";
 import { SidePanel } from "@/components/ui/SidePanel";
 import { request } from "@/lib/api";
@@ -76,6 +76,11 @@ export default function Home() {
   const [drilldownNurse, setDrilldownNurse] = useState<Staff | null>(null);
   const [showRightPanel, setShowRightPanel] = useState(false);
   const [showLeftPanel, setShowLeftPanel] = useState(true);
+
+  // Unpublish Modal State
+  const [showUnpublishModal, setShowUnpublishModal] = useState(false);
+  const [unpublishReason, setUnpublishReason] = useState("");
+  const [unpublishTargetId, setUnpublishTargetId] = useState<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1100px)");
@@ -219,7 +224,8 @@ export default function Home() {
         return;
       }
       setVersions(list.data);
-      const targetId = list.data[0].id;
+      const published = list.data.find(s => s.status === "published");
+      const targetId = published ? published.id : list.data[0].id;
       const res = await request<RosterResponse>("/schedules/" + targetId, token);
       setData(res);
       void loadVersions(targetId);
@@ -447,8 +453,54 @@ export default function Home() {
       const res = await request<RosterResponse>(`/schedules/${roster.id}/publish`, token, "POST");
       setData(res);
       setNotice("ประกาศใช้งานตารางเวรเรียบร้อยแล้ว");
+      void loadVersions(roster.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "ประกาศใช้งานไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unpublishSchedule(scheduleId: number, reason: string) {
+    if (!reason || reason.trim().length < 5) {
+      setError("กรุณาระบุเหตุผลการยกเลิกการประกาศใช้อย่างน้อย 5 ตัวอักษร");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await request<RosterResponse>(`/schedules/${scheduleId}/unpublish`, token, "POST", { reason: reason.trim() });
+      setData(res);
+      setShowUnpublishModal(false);
+      setUnpublishReason("");
+      setUnpublishTargetId(null);
+      setNotice("ยกเลิกการประกาศใช้ตารางเวรเรียบร้อยแล้ว (สถานะเปลี่ยนกลับเป็นแบบร่าง)");
+      void loadVersions(scheduleId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ยกเลิกการประกาศใช้ไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteDraftSchedule(scheduleId: number) {
+    const confirmDel = window.confirm(`คุณต้องการลบ Draft ตาราง #${scheduleId} ออกจากระบบใช่หรือไม่?`);
+    if (!confirmDel) return;
+    setBusy(true);
+    try {
+      await request(`/schedules/${scheduleId}`, token, "DELETE");
+      setNotice(`ลบแบบร่างตาราง #${scheduleId} เรียบร้อยแล้ว`);
+      const list = await request<{ data: ScheduleSummary[] }>(`/wards/${encodeURIComponent(ward)}/schedules?month=${mon}&year=${year}`, token);
+      setVersions(list.data);
+      if (roster?.id === scheduleId) {
+        if (list.data.length > 0) {
+          const pub = list.data.find(s => s.status === "published");
+          await loadScheduleById(pub ? pub.id : list.data[0].id);
+        } else {
+          setData(null);
+        }
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "ลบแบบร่างไม่สำเร็จ");
     } finally {
       setBusy(false);
     }
@@ -784,8 +836,94 @@ const holidaySet = new Set<string>();
 
       <div className="nf-workspace">
         <main className="min-w-0" aria-busy={busy || saving}>
-          {activeWorkspace === "home" && (
+          {activeWorkspace === "home" && (() => {
+            const publishedSchedule = versions.find(v => v.status === "published");
+            const draftCount = versions.filter(v => v.status === "draft" || v.status === "generated").length;
+
+            return (
             <section className="space-y-5 p-4 sm:p-6" aria-labelledby="work-home-title">
+              {/* 1. Official Published Schedule Spotlight Card (if currently open roster is published) */}
+              {roster && roster.status === "published" && (
+                <div className="rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-50/80 via-teal-50/40 to-white p-6 shadow-sm relative overflow-hidden">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 shrink-0">
+                      ✓
+                    </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-lg font-bold text-emerald-950">ตารางเวรฉบับทางการ #{roster.id} (v{roster.version})</h2>
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          📢 ประกาศใช้แล้ว
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        ประกาศโดย <strong className="text-slate-800">{roster.publishedBy || "หัวหน้าหอผู้ป่วย"}</strong> {roster.publishedAt ? `· เมื่อ ${new Date(roster.publishedAt).toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : ""}
+                      </p>
+                      <div className="flex flex-wrap gap-4 text-xs text-slate-600 pt-1 font-medium">
+                        <span>👥 บุคลากร: <strong>{roster.staff.length} คน</strong></span>
+                        <span>📅 เวรทั้งหมด: <strong>{roster.assignments.length} ช่อง</strong></span>
+                        <span>✓ ผลตรวจ: <strong>{criticalViolations.length === 0 ? "ผ่านข้อบังคับ 100%" : `มีข้อควรตรวจ ${criticalViolations.length} จุด`}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-5 pt-4 border-t border-emerald-200/60 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="nf-button nf-button-primary bg-emerald-700 hover:bg-emerald-800 border-emerald-800" onClick={() => openWorkspace("schedule")}>
+                        <CalendarDaysIcon /> ดูตารางเวรฉบับนี้
+                      </button>
+                      <button type="button" className="nf-button" onClick={() => setShowPrintModal(true)}>
+                        <PrinterIcon /> พิมพ์ A4
+                      </button>
+                    </div>
+                    {isHead && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUnpublishTargetId(roster.id);
+                          setUnpublishReason("");
+                          setShowUnpublishModal(true);
+                        }}
+                        className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                      >
+                        <ExclamationTriangleIcon className="w-4 h-4 text-rose-600" />
+                        <span>ขอยกเลิกการประกาศใช้</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Notice if viewing a draft when another official published version exists */}
+              {roster && roster.status !== "published" && publishedSchedule && (
+                <div className="rounded-xl border border-emerald-300 bg-emerald-50/70 p-4 flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">📢</span>
+                    <div>
+                      <p className="text-sm font-bold text-emerald-950">มีตารางเวรฉบับทางการที่ประกาศใช้แล้ว (#{publishedSchedule.id} · v{publishedSchedule.version})</p>
+                      <p className="text-xs text-emerald-700">สามารถสลับไปเปิดดูตารางฉบับทางการ หรือขอยกเลิกประกาศใช้ได้</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" className="nf-button bg-emerald-700 text-white hover:bg-emerald-800" onClick={() => void loadScheduleById(publishedSchedule.id)}>
+                      เปิดฉบับประกาศใช้
+                    </button>
+                    {isHead && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUnpublishTargetId(publishedSchedule.id);
+                          setUnpublishReason("");
+                          setShowUnpublishModal(true);
+                        }}
+                        className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-bold transition cursor-pointer"
+                      >
+                        ยกเลิกประกาศใช้
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-indigo-50/40 to-white p-5 sm:p-7 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
@@ -895,23 +1033,63 @@ const holidaySet = new Set<string>();
             </div>
           )}
 
-              <details className="rounded-xl border border-slate-200 bg-white p-5">
-                <summary className="cursor-pointer font-bold">ตารางแต่ละฉบับในเดือนที่เลือก ({versions.length})</summary>
-                <p className="mt-1 text-sm text-slate-600">แสดงฉบับที่ประกาศใช้ก่อน เลือกเปิดฉบับเพื่อดูผลตรวจล่าสุด</p>
+              <details open className="rounded-xl border border-slate-200 bg-white p-5">
+                <summary className="cursor-pointer font-bold flex items-center justify-between flex-wrap gap-2">
+                  <span>ตารางแต่ละฉบับในเดือนที่เลือก ({versions.length})</span>
+                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                    โควตาแบบร่าง: {draftCount} / 12 Drafts
+                  </span>
+                </summary>
+                <p className="mt-1 text-xs text-slate-500">
+                  ระบบจะเรียงฉบับทางการที่ประกาศใช้ขึ้นก่อน และจำกัดจำนวน Draft ไม่เกิน 12 ฉบับ/เดือน (หากเกินจะตัด Draft เก่าออกอัตโนมัติ)
+                </p>
                 {!versions.length ? <p className="mt-4 text-sm text-slate-600">ยังไม่มีรายการให้แสดง กรุณาเปิดตารางเดือนนี้ก่อน หากไม่พบตาราง ให้เริ่มที่เตรียมข้อมูล</p> : <ul className="mt-4 space-y-3">
-                  {[...versions].sort((a, b) => Number(b.status === "published") - Number(a.status === "published") || b.id - a.id).map(version => <li key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
-                    <div>
-                      <p className="font-semibold">ตาราง #{version.id} · v{version.version}{version.id === roster?.id ? " · กำลังเปิดอยู่" : ""}</p>
-                      <p className="mt-1 text-sm">{statusConfig[version.status]?.label ?? version.status} · {version.status === "published" ? "ประกาศใช้แล้ว" : version.status === "closed" ? "ข้อมูลย้อนหลัง" : "ยังไม่ประกาศใช้"}</p>
-                      <p className="mt-1 text-xs text-slate-600">{version.id === roster?.id && data?.report ? criticalViolations.length ? `ผลตรวจ: ต้องแก้ไข ${criticalViolations.length} จุด` : "ผลตรวจ: ผ่านข้อบังคับ" : "เปิดฉบับนี้เพื่อดูผลตรวจ"}</p>
-                    </div>
-                    <button className="nf-button" disabled={busy} onClick={() => void loadScheduleById(version.id)}>เปิดฉบับ #{version.id}</button>
-                  </li>)}
+                  {versions.map(version => {
+                    const isPublished = version.status === "published";
+                    const isDraft = version.status === "draft" || version.status === "generated";
+                    return (
+                      <li key={version.id} className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 ${isPublished ? "border-emerald-300 bg-emerald-50/40" : "border-slate-200 bg-white"}`}>
+                        <div className="flex items-center gap-3">
+                          <span className={`w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center ${isPublished ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700 border border-slate-200"}`}>
+                            v{version.version}
+                          </span>
+                          <div>
+                            <p className="font-semibold text-slate-900 flex items-center gap-2">
+                              ตาราง #{version.id} · v{version.version}
+                              {version.id === roster?.id && <span className="text-2xs px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold">กำลังเปิดอยู่</span>}
+                              {isPublished && <span className="text-2xs px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold">📢 ใช้งานจริง</span>}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-600">
+                              {statusConfig[version.status]?.label ?? version.status} · {isPublished ? "ประกาศใช้แล้ว" : version.status === "closed" ? "ข้อมูลย้อนหลัง (ปิดงวด)" : "แบบร่างยังไม่ประกาศใช้"}
+                            </p>
+                            <p className="mt-0.5 text-2xs text-slate-500">{version.id === roster?.id && data?.report ? criticalViolations.length ? `ผลตรวจ: ต้องแก้ไข ${criticalViolations.length} จุด` : "ผลตรวจ: ผ่านข้อบังคับ" : "เปิดฉบับนี้เพื่อดูผลตรวจ"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button className="nf-button" disabled={busy} onClick={() => void loadScheduleById(version.id)}>
+                            {version.id === roster?.id ? "ดูรายละเอียด" : `เปิดฉบับ #${version.id}`}
+                          </button>
+                          {isHead && isDraft && (
+                            <button
+                              type="button"
+                              title="ลบแบบร่างนี้"
+                              disabled={busy}
+                              onClick={() => void deleteDraftSchedule(version.id)}
+                              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 hover:border-rose-300 transition cursor-pointer"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>}
               </details>
               <p className="text-sm text-slate-600">ลำดับงาน: เตรียมข้อมูล → จัดตาราง → ตรวจข้อผิดพลาด → ส่งอนุมัติ → ประกาศใช้</p>
             </section>
-          )}
+            );
+          })()}
 
           {(activeWorkspace === "schedule" || activeWorkspace === "review") && roster && <div className="nf-schedule-tools">
             <div className="nf-toolbar"><div className="nf-palette" role="group" aria-label="เลือกประเภทเวร"><button type="button" className="nf-button" disabled={!canEdit} aria-pressed={brushMode} onClick={() => {setBrushMode(!brushMode); setActiveCell(null);}}> {brushMode ? "ออกจากโหมดลงหลายช่อง" : "ลงเวรหลายช่อง"}</button>{availablePaletteShifts.map((code, codeIdx) => <button key={`${code}_${codeIdx}`} type="button" disabled={!canEdit || busy || saving} title={roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name || code} aria-pressed={brushMode && activeBrush === code} className={`nf-shift-choice ${brushMode && activeBrush === code ? "is-selected" : ""}`} onClick={() => {setActiveBrush(code); setBrushMode(true); setActiveCell(null);}}><ShiftBadge shiftCode={code} size="sm"/><span>{roster.shifts.find(shift => shift.code === code)?.name || SHIFT_CONFIGS[code]?.name.split(" (")[0] || code}</span></button>)}
@@ -937,8 +1115,21 @@ const holidaySet = new Set<string>();
                     <button type="button" className="approval-primary approval-purple" onClick={() => void publishSchedule()} disabled={busy}>ประกาศใช้งาน v{roster.version}</button>
                   )}
                   {isHead && roster.status === "published" && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-xs text-purple-700 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200 font-bold">📢 ประกาศใช้งานแล้ว v{roster.version}</span>
+                      <button
+                        type="button"
+                        className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 rounded-lg text-xs font-bold transition shadow-2xs inline-flex items-center gap-1.5 cursor-pointer"
+                        onClick={() => {
+                          setUnpublishTargetId(roster.id);
+                          setUnpublishReason("");
+                          setShowUnpublishModal(true);
+                        }}
+                        disabled={busy}
+                      >
+                        <ExclamationTriangleIcon className="w-4 h-4 text-rose-600" />
+                        ขอยกเลิกการประกาศใช้ (Unpublish)
+                      </button>
                       <button type="button" className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition shadow-sm inline-flex items-center gap-1.5" onClick={() => void closeSchedule()} disabled={busy}>
                         <span>🔒</span> ปิดงวดบัญชี (Close)
                       </button>

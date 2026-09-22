@@ -43,7 +43,7 @@ func (s *RosterStore) Get(ctx context.Context, id int64) (domain.Roster, error) 
 	return r, tx.Commit()
 }
 func (s *RosterStore) List(ctx context.Context, w string, m, y int) ([]domain.Roster, error) {
-	rows, e := s.DB.QueryContext(ctx, "SELECT id,ward_id,month,year,status,version FROM schedules WHERE ward_id=? AND month=? AND year=? ORDER BY id", w, m, y)
+	rows, e := s.DB.QueryContext(ctx, "SELECT id,ward_id,month,year,status,version FROM schedules WHERE ward_id=? AND month=? AND year=? ORDER BY (status = 'published') DESC, version DESC, id DESC", w, m, y)
 	if e != nil {
 		return nil, e
 	}
@@ -75,6 +75,7 @@ func (s *RosterStore) Create(ctx context.Context, w string, m, y int, a domain.A
 	if e = lockWard(ctx, tx, w); e != nil {
 		return domain.Roster{}, e
 	}
+	_ = pruneOldDrafts(ctx, tx, w, m, y, 12)
 	res, e := tx.ExecContext(ctx, "INSERT INTO schedules(ward_id,month,year,status) VALUES(?,?,?,'draft')", w, m, y)
 	if e != nil {
 		return domain.Roster{}, dbError(e)
@@ -521,13 +522,79 @@ func (s *RosterStore) UpdateStatus(ctx context.Context, id int64, status string,
 	args := []any{status}
 	for k, v := range meta {
 		setClauses += "," + k + "=?"
-		args = append(args, v)
+		if v == "" {
+			args = append(args, nil)
+		} else {
+			args = append(args, v)
+		}
 	}
 	args = append(args, id)
 	if _, e = tx.ExecContext(ctx, "UPDATE schedules SET "+setClauses+" WHERE id=?", args...); e != nil {
 		return e
 	}
 	if e = audit(ctx, tx, id, w, a); e != nil {
+		return e
+	}
+	return tx.Commit()
+}
+
+func deleteScheduleCascade(ctx context.Context, tx *sql.Tx, id int64) error {
+	tables := []string{
+		"assignment_locks WHERE assignment_id IN (SELECT id FROM schedule_assignments WHERE schedule_id=?)",
+		"schedule_assignments WHERE schedule_id=?",
+		"schedule_boundary_data WHERE schedule_id=?",
+		"schedule_scores WHERE schedule_id=?",
+		"schedule_audit WHERE schedule_id=?",
+		"solver_jobs WHERE schedule_id=?",
+		"payroll_overrides WHERE schedule_id=?",
+	}
+	for _, t := range tables {
+		_, _ = tx.ExecContext(ctx, "DELETE FROM "+t, id)
+	}
+	_, err := tx.ExecContext(ctx, "DELETE FROM schedules WHERE id=?", id)
+	return err
+}
+
+func pruneOldDrafts(ctx context.Context, tx *sql.Tx, wardID string, month, year, maxDrafts int) error {
+	rows, err := tx.QueryContext(ctx, "SELECT id FROM schedules WHERE ward_id=? AND month=? AND year=? AND status IN ('draft','generated') ORDER BY id ASC", wardID, month, year)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	var draftIDs []int64
+	for rows.Next() {
+		var did int64
+		if err := rows.Scan(&did); err == nil {
+			draftIDs = append(draftIDs, did)
+		}
+	}
+	if len(draftIDs) >= maxDrafts {
+		toDeleteCount := len(draftIDs) - maxDrafts + 1
+		for i := 0; i < toDeleteCount; i++ {
+			_ = deleteScheduleCascade(ctx, tx, draftIDs[i])
+		}
+	}
+	return nil
+}
+
+func (s *RosterStore) Delete(ctx context.Context, id int64, a domain.Audit) error {
+	tx, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	var w string
+	var status string
+	if e = tx.QueryRowContext(ctx, "SELECT ward_id, status FROM schedules WHERE id=?", id).Scan(&w, &status); e != nil {
+		return dbError(e)
+	}
+	if status != domain.StatusDraft && status != domain.StatusGenerated {
+		return repository.ErrConflict
+	}
+	if e = lockWard(ctx, tx, w); e != nil {
+		return e
+	}
+	if e = deleteScheduleCascade(ctx, tx, id); e != nil {
 		return e
 	}
 	return tx.Commit()
@@ -547,9 +614,7 @@ func (s *RosterStore) CreateVersion(ctx context.Context, parentID int64, a domai
 	if e = lockWard(ctx, tx, wardID); e != nil {
 		return domain.Roster{}, e
 	}
-	// Remove unique constraint conflict: delete existing draft for same ward/month/year if any
-	// Actually just insert with new version — the unique key was on (ward_id, month, year) so we need to drop it or handle it.
-	// For now, the migration should have dropped the unique key, or we just let it be.
+	_ = pruneOldDrafts(ctx, tx, wardID, month, year, 12)
 	res, e := tx.ExecContext(ctx, "INSERT INTO schedules(ward_id,month,year,status,version,parent_id) VALUES(?,?,?,'draft',?,?)", wardID, month, year, version+1, parentID)
 	if e != nil {
 		return domain.Roster{}, dbError(e)
@@ -579,7 +644,7 @@ func (s *RosterStore) CreateVersion(ctx context.Context, parentID int64, a domai
 }
 
 func (s *RosterStore) ListVersions(ctx context.Context, wardID string, month, year int) ([]domain.Roster, error) {
-	rows, e := s.DB.QueryContext(ctx, "SELECT id,ward_id,month,year,status,version FROM schedules WHERE ward_id=? AND month=? AND year=? ORDER BY version DESC", wardID, month, year)
+	rows, e := s.DB.QueryContext(ctx, "SELECT id,ward_id,month,year,status,version FROM schedules WHERE ward_id=? AND month=? AND year=? ORDER BY (status = 'published') DESC, version DESC, id DESC", wardID, month, year)
 	if e != nil {
 		return nil, e
 	}
