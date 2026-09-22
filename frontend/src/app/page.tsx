@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { CalendarDaysIcon, UsersIcon, CalendarIcon, Cog6ToothIcon, ChartBarIcon, SparklesIcon, ArrowLeftOnRectangleIcon, Bars3Icon, PlusIcon, PrinterIcon, ExclamationTriangleIcon, InformationCircleIcon, MagnifyingGlassIcon, XMarkIcon, ClipboardDocumentCheckIcon, BuildingOffice2Icon, ArrowPathIcon, CheckCircleIcon, ShieldCheckIcon, BackspaceIcon, BanknotesIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { ModalFrame } from "@/components/ui/ModalFrame";
@@ -31,7 +32,7 @@ import { CoverageSummaryRow, computeRosterDailyCoverage } from "@/components/sch
 import { NurseStatsColumn } from "@/components/schedule/NurseStatsColumn";
 import { PayrollDrilldownModal } from "@/features/dashboard/PayrollDrilldownModal";
 import { OfficialRosterPrint } from "@/components/print/OfficialRosterPrint";
-import { formatThaiMonthYear } from "@/lib/dateUtils";
+import { formatThaiMonthYear, THAI_MONTH_SHORT, toBuddhistYear } from "@/lib/dateUtils";
 import type { Cell, Edit, Nurse, RosterResponse, ScheduleSummary, Violation, Ward, Staff } from "@/types/schedule";
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; border: string; icon: string }> = {
@@ -114,6 +115,17 @@ export default function Home() {
   const daysInMonth = Number.isFinite(year) && mon >= 1 && mon <= 12 ? new Date(Date.UTC(year, mon, 0)).getUTCDate() : 0;
   const dates = Array.from({ length: daysInMonth }, (_, i) => `${month}-${String(i + 1).padStart(2, "0")}`);
   const thaiMonthYear = useMemo(() => formatThaiMonthYear(month), [month]);
+  const annualMonthOptions = useMemo(() => {
+    const baseYear = Number.isFinite(year) ? year : new Date().getFullYear();
+    return THAI_MONTH_SHORT.map((label, index) => {
+      const monthNumber = index + 1;
+      return {
+        label,
+        value: `${baseYear}-${String(monthNumber).padStart(2, "0")}`,
+        monthNumber,
+      };
+    });
+  }, [year]);
 
   const loadWards = useCallback(async () => {
     try {
@@ -737,10 +749,10 @@ const holidaySet = new Set<string>();
         <>
       <div className={`nf-shell ${showPrintModal ? "print-hidden" : ""} ${showLeftPanel ? "nav-expanded" : "nav-collapsed"}`}>
         <aside className="nf-sidebar no-print" aria-label="เมนูหลัก">
-          <div className="nf-brand"><BuildingOffice2Icon aria-hidden="true" /><div className="nav-label"><strong>เวรEasy</strong><p>ระบบบริหารและจัดตารางเวร</p></div></div>
+          <div className="nf-brand"><Image src="/jad-easy-logo.png" alt="ระบบจัดตารางเวรพยาบาล" width={150} height={90} priority className="nf-brand-logo" /><div className="nav-label"><p>ระบบบริหารและจัดตารางเวร</p></div></div>
           <nav className="nf-menu" aria-label="พื้นที่ทำงาน">
             {[
-              {label:"งานจัดตารางเวร", icon:ClipboardDocumentCheckIcon, key:"home" as const},
+              {label:"ตารางเวรแต่ละเดือน", icon:ClipboardDocumentCheckIcon, key:"home" as const},
               {label:"เตรียมข้อมูล", icon:ClipboardDocumentCheckIcon, key:"preflight" as const},
               {label:"จัดตารางเวร", icon:CalendarDaysIcon, key:"schedule" as const},
               {label:"ภาพรวม", icon:ChartBarIcon, key:"overview" as const},
@@ -763,7 +775,7 @@ const holidaySet = new Set<string>();
         <div className="flex items-center gap-3 min-w-0">
           <button className="nf-icon-button" onClick={() => setShowLeftPanel(!showLeftPanel)} aria-label="เปิด/ปิดเมนูหลัก" aria-expanded={showLeftPanel}><Bars3Icon/></button>
           <div><h1>{
-            activeWorkspace === "home" ? "งานจัดตารางเวร" :
+            activeWorkspace === "home" ? "ตารางเวรแต่ละเดือน" :
             activeWorkspace === "overview" ? "ภาพรวมตารางเวร" :
             activeWorkspace === "proposals" ? "ข้อเสนอการจัดเวร" :
             activeWorkspace === "approval" ? "อนุมัติและประกาศ" :
@@ -965,6 +977,36 @@ const holidaySet = new Set<string>();
                   </>}
                 </div>
               </div>
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" aria-labelledby="annual-month-menu-title">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 id="annual-month-menu-title" className="font-bold text-slate-900">ตารางเวร 12 เดือน</h3>
+                    <p className="mt-1 text-xs text-slate-500">เลือกเดือนประจำปี พ.ศ. {toBuddhistYear(year)} เพื่อเปิดดูหรือจัดตารางเวร</p>
+                  </div>
+                  <span className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">กำลังเลือก {thaiMonthYear}</span>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                  {annualMonthOptions.map((item) => {
+                    const selected = item.value === month;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => { clearScheduleContext(); setMonth(item.value); }}
+                        className={`min-h-16 rounded-xl border px-3 py-2 text-left transition ${selected ? "border-blue-500 bg-blue-50 text-blue-900 shadow-[0_0_0_1px_#3b82f6]" : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/60"}`}
+                      >
+                        <span className="block text-xs font-bold">{String(item.monthNumber).padStart(2, "0")}</span>
+                        <span className="mt-1 block text-sm font-extrabold">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button className="nf-button nf-button-primary" disabled={busy || !month || !ward} onClick={() => void load()}><CalendarDaysIcon/>เปิดตารางเดือนที่เลือก</button>
+                  {isHead && <button className="nf-button" onClick={() => openWorkspace("preflight")}>เตรียมข้อมูลก่อนจัดเวร</button>}
+                </div>
+              </section>
               {roster && <div className="grid gap-4 sm:grid-cols-2">
                 <article className="rounded-xl border border-slate-200 bg-white p-5">
                   <h3 className="font-bold">ผลตรวจตารางที่เปิดอยู่</h3>
@@ -1820,7 +1862,7 @@ const holidaySet = new Set<string>();
         )}
       </div>
 
-        <footer className="nf-footer no-print"><span role="status">{saving ? "กำลังบันทึก… " : lastSaved ? `บันทึกแล้ว ${lastSaved} · ` : ""}{roster ? `ตารางประจำเดือน ${thaiMonthYear} · เจ้าหน้าที่ ${roster.staff.length} คน · ฉบับ v${roster.version}` : "เลือกหน่วยงานและเดือนเพื่อเริ่มต้น"}</span><span>เวรEasy</span></footer>
+        <footer className="nf-footer no-print"><span role="status">{saving ? "กำลังบันทึก… " : lastSaved ? `บันทึกแล้ว ${lastSaved} · ` : ""}{roster ? `ตารางประจำเดือน ${thaiMonthYear} · เจ้าหน้าที่ ${roster.staff.length} คน · ฉบับ v${roster.version}` : "เลือกหน่วยงานและเดือนเพื่อเริ่มต้น"}</span><span>ระบบจัดตารางเวรพยาบาล</span></footer>
         </div>
       </div>
       {/* QUICK FLOATING SHIFT PICKER */}
@@ -1872,15 +1914,4 @@ const holidaySet = new Set<string>();
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 
