@@ -272,64 +272,123 @@ export function OfficialRosterPrint({
               ))}
 
               {/* Daily Staffing Summary Rows */}
+              {/* เวรเช้า (ช) */}
               <tr className="border-t-2 border-slate-800 font-bold bg-slate-100">
                 <td colSpan={3} className="border border-slate-800 p-1 text-left">
                   <div className="flex justify-between items-center text-[9px]">
                     <span>เวรเช้า (ช)</span>
-                    <span className="text-slate-500 font-normal">RN / PN / รวม</span>
+                    <span className="text-slate-500 font-normal">
+                      {printFilter === "rn" ? "เฉพาะ RN" : printFilter === "pn" ? "เฉพาะ PN" : "RN / PN / รวม"}
+                    </span>
                   </div>
                 </td>
                 {dailyCounts.map((c) => (
                   <td key={c.date} className="border border-slate-800 p-0.5 text-center leading-tight">
-                    <div className="text-[8px] font-semibold text-blue-800">{c.mRN}</div>
-                    <div className="text-[8px] font-semibold text-amber-800">{c.mPN}</div>
-                    <div className="text-[9px] font-black border-t border-slate-300">{c.m}</div>
+                    {printFilter === "rn" ? (
+                      <div className="text-[10px] font-bold text-blue-900">{c.mRN}</div>
+                    ) : printFilter === "pn" ? (
+                      <div className="text-[10px] font-bold text-amber-900">{c.mPN}</div>
+                    ) : (
+                      <>
+                        <div className="text-[8px] font-semibold text-blue-800">{c.mRN}</div>
+                        <div className="text-[8px] font-semibold text-amber-800">{c.mPN}</div>
+                        <div className="text-[9px] font-black border-t border-slate-300">{c.m}</div>
+                      </>
+                    )}
                   </td>
                 ))}
                 <td colSpan={6} className="border border-slate-800 text-center font-bold">
-                  <div className="text-[8px] text-blue-800">RN: {dailyCounts.reduce((s, c) => s + c.mRN, 0)}</div>
-                  <div className="text-[8px] text-amber-800">PN: {dailyCounts.reduce((s, c) => s + c.mPN, 0)}</div>
-                  <div className="text-[9px] font-black border-t border-slate-300">รวม {dailyCounts.reduce((s, c) => s + c.m, 0)}</div>
+                  {printFilter === "rn" ? (
+                    <div className="text-[9px] font-black text-blue-900">รวม RN: {dailyCounts.reduce((s, c) => s + c.mRN, 0)}</div>
+                  ) : printFilter === "pn" ? (
+                    <div className="text-[9px] font-black text-amber-900">รวม PN: {dailyCounts.reduce((s, c) => s + c.mPN, 0)}</div>
+                  ) : (
+                    <>
+                      <div className="text-[8px] text-blue-800">RN: {dailyCounts.reduce((s, c) => s + c.mRN, 0)}</div>
+                      <div className="text-[8px] text-amber-800">PN: {dailyCounts.reduce((s, c) => s + c.mPN, 0)}</div>
+                      <div className="text-[9px] font-black border-t border-slate-300">รวม {dailyCounts.reduce((s, c) => s + c.m, 0)}</div>
+                    </>
+                  )}
                 </td>
               </tr>
+
+              {/* เวรบ่าย (บ) */}
               <tr className="border-b border-slate-800 font-bold bg-slate-100">
                 <td colSpan={3} className="border border-slate-800 p-1 text-left">
                   <div className="flex justify-between items-center text-[9px]">
                     <span>เวรบ่าย (บ)</span>
-                    <span className="text-slate-500 font-normal">RN / PN / รวม</span>
+                    <span className="text-slate-500 font-normal">
+                      {printFilter === "rn" ? "เฉพาะ RN" : printFilter === "pn" ? "เฉพาะ PN" : "RN / PN / รวม"}
+                    </span>
                   </div>
                 </td>
                 {dailyCounts.map((c) => (
                   <td key={c.date} className="border border-slate-800 p-0.5 text-center leading-tight">
-                    <div className="text-[8px] font-semibold text-blue-800">{c.eRN}</div>
-                    <div className="text-[8px] font-semibold text-amber-800">{c.ePN}</div>
-                    <div className="text-[9px] font-black border-t border-slate-300">{c.e}</div>
+                    {printFilter === "rn" ? (
+                      <div className="text-[10px] font-bold text-blue-900">{c.eRN}</div>
+                    ) : printFilter === "pn" ? (
+                      <div className="text-[10px] font-bold text-amber-900">{c.ePN}</div>
+                    ) : (
+                      <>
+                        <div className="text-[8px] font-semibold text-blue-800">{c.eRN}</div>
+                        <div className="text-[8px] font-semibold text-amber-800">{c.ePN}</div>
+                        <div className="text-[9px] font-black border-t border-slate-300">{c.e}</div>
+                      </>
+                    )}
                   </td>
                 ))}
                 <td colSpan={6} className="border border-slate-800 text-center font-bold">
-                  <div className="text-[8px] text-blue-800">RN: {dailyCounts.reduce((s, c) => s + c.eRN, 0)}</div>
-                  <div className="text-[8px] text-amber-800">PN: {dailyCounts.reduce((s, c) => s + c.ePN, 0)}</div>
-                  <div className="text-[9px] font-black border-t border-slate-300">รวม {dailyCounts.reduce((s, c) => s + c.e, 0)}</div>
+                  {printFilter === "rn" ? (
+                    <div className="text-[9px] font-black text-blue-900">รวม RN: {dailyCounts.reduce((s, c) => s + c.eRN, 0)}</div>
+                  ) : printFilter === "pn" ? (
+                    <div className="text-[9px] font-black text-amber-900">รวม PN: {dailyCounts.reduce((s, c) => s + c.ePN, 0)}</div>
+                  ) : (
+                    <>
+                      <div className="text-[8px] text-blue-800">RN: {dailyCounts.reduce((s, c) => s + c.eRN, 0)}</div>
+                      <div className="text-[8px] text-amber-800">PN: {dailyCounts.reduce((s, c) => s + c.ePN, 0)}</div>
+                      <div className="text-[9px] font-black border-t border-slate-300">รวม {dailyCounts.reduce((s, c) => s + c.e, 0)}</div>
+                    </>
+                  )}
                 </td>
               </tr>
+
+              {/* เวรดึก (ด) */}
               <tr className="border-b-2 border-slate-800 font-bold bg-slate-100">
                 <td colSpan={3} className="border border-slate-800 p-1 text-left">
                   <div className="flex justify-between items-center text-[9px]">
                     <span>เวรดึก (ด)</span>
-                    <span className="text-slate-500 font-normal">RN / PN / รวม</span>
+                    <span className="text-slate-500 font-normal">
+                      {printFilter === "rn" ? "เฉพาะ RN" : printFilter === "pn" ? "เฉพาะ PN" : "RN / PN / รวม"}
+                    </span>
                   </div>
                 </td>
                 {dailyCounts.map((c) => (
                   <td key={c.date} className="border border-slate-800 p-0.5 text-center leading-tight">
-                    <div className="text-[8px] font-semibold text-blue-800">{c.nRN}</div>
-                    <div className="text-[8px] font-semibold text-amber-800">{c.nPN}</div>
-                    <div className="text-[9px] font-black border-t border-slate-300">{c.n}</div>
+                    {printFilter === "rn" ? (
+                      <div className="text-[10px] font-bold text-blue-900">{c.nRN}</div>
+                    ) : printFilter === "pn" ? (
+                      <div className="text-[10px] font-bold text-amber-900">{c.nPN}</div>
+                    ) : (
+                      <>
+                        <div className="text-[8px] font-semibold text-blue-800">{c.nRN}</div>
+                        <div className="text-[8px] font-semibold text-amber-800">{c.nPN}</div>
+                        <div className="text-[9px] font-black border-t border-slate-300">{c.n}</div>
+                      </>
+                    )}
                   </td>
                 ))}
                 <td colSpan={6} className="border border-slate-800 text-center font-bold">
-                  <div className="text-[8px] text-blue-800">RN: {dailyCounts.reduce((s, c) => s + c.nRN, 0)}</div>
-                  <div className="text-[8px] text-amber-800">PN: {dailyCounts.reduce((s, c) => s + c.nPN, 0)}</div>
-                  <div className="text-[9px] font-black border-t border-slate-300">รวม {dailyCounts.reduce((s, c) => s + c.n, 0)}</div>
+                  {printFilter === "rn" ? (
+                    <div className="text-[9px] font-black text-blue-900">รวม RN: {dailyCounts.reduce((s, c) => s + c.nRN, 0)}</div>
+                  ) : printFilter === "pn" ? (
+                    <div className="text-[9px] font-black text-amber-900">รวม PN: {dailyCounts.reduce((s, c) => s + c.nPN, 0)}</div>
+                  ) : (
+                    <>
+                      <div className="text-[8px] text-blue-800">RN: {dailyCounts.reduce((s, c) => s + c.nRN, 0)}</div>
+                      <div className="text-[8px] text-amber-800">PN: {dailyCounts.reduce((s, c) => s + c.nPN, 0)}</div>
+                      <div className="text-[9px] font-black border-t border-slate-300">รวม {dailyCounts.reduce((s, c) => s + c.n, 0)}</div>
+                    </>
+                  )}
                 </td>
               </tr>
             </tbody>
