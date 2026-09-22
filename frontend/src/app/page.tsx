@@ -692,7 +692,6 @@ const holidaySet = new Set<string>();
               {label:"เตรียมข้อมูล", icon:ClipboardDocumentCheckIcon, key:"preflight" as const},
               {label:"จัดตารางเวร", icon:CalendarDaysIcon, key:"schedule" as const},
               {label:"ภาพรวม", icon:ChartBarIcon, key:"overview" as const},
-              {label:"ข้อเสนอ", icon:SparklesIcon, key:"proposals" as const},
               {label:"อนุมัติ/ประกาศ", icon:ShieldCheckIcon, key:"approval" as const},
             ].map(item => <button key={item.key} title={item.label} type="button" aria-current={activeWorkspace === item.key ? "page" : undefined} onClick={() => openWorkspace(item.key)} className={`nf-menu-item ${activeWorkspace === item.key ? "is-active" : ""}`}><item.icon aria-hidden="true"/><span className="nav-label">{item.label}</span></button>)}
             <div className="nf-menu-divider"><span className="nav-label">จัดการข้อมูล</span></div>
