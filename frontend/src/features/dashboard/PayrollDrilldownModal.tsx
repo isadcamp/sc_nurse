@@ -384,7 +384,7 @@ export function PayrollDrilldownModal({
             การรับรองความถูกต้องของข้อมูล (Audit & Certification)
           </div>
           <p className="text-[11px] leading-relaxed">
-            รายการคำนวณนี้ออกโดยระบบ <strong>เวรEasy Payroll Engine</strong> คำนวณตามระเบียบโรงพยาบาล:
+            รายการคำนวณนี้ออกโดยระบบ <strong>Payroll Engine</strong> คำนวณตามระเบียบโรงพยาบาล:
             ฐานทำงาน {workingDays} วันทำการ ({statement.standardHours} ชม.), อัตราค่าเวรบ่ายดึก {eveRate} ฿/หน่วย (เพดาน {allowanceCap > 0 ? `${allowanceCap} วัน` : "ไม่จำกัด"}), และอัตราค่าล่วงเวลา OT {otHourlyRate} ฿/ชม. (~{(otHourlyRate * 8).toLocaleString()} ฿/เวร 8 ชม.)
           </p>
         </div>
@@ -403,3 +403,4 @@ export function PayrollDrilldownModal({
     </ModalFrame>
   );
 }
+

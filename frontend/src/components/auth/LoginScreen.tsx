@@ -1,4 +1,5 @@
 "use client";
+import Image from "next/image";
 
 import { useState } from "react";
 import { request } from "@/lib/api";
@@ -7,7 +8,6 @@ import {
   UserIcon,
   EyeIcon,
   EyeSlashIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   KeyIcon,
 } from "@heroicons/react/24/outline";
@@ -99,10 +99,14 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       <div className="w-full max-w-md relative z-10">
         {/* Brand Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xl shadow-blue-500/30 text-white mb-4 border border-blue-400/30">
-            <ShieldCheckIcon className="w-9 h-9" />
-          </div>
-          <h1 className="text-2xl font-black text-gray-800 tracking-tight">เวรEasy</h1>
+          <Image
+            src="/jad-easy-logo.png"
+            alt="ระบบจัดตารางเวรพยาบาล"
+            width={400}
+            height={275}
+            priority
+            className="mx-auto h-42 w-auto object-contain"
+          />
           <p className="text-sm text-gray-500 mt-1">ระบบจัดตารางเวรและบริหารจัดการบุคลากรทางการพยาบาล</p>
         </div>
 
@@ -271,3 +275,4 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     </div>
   );
 }
+
