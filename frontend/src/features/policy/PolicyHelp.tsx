@@ -63,14 +63,24 @@ const policyHelp = {
   },
 } satisfies Record<string, Help>;
 
-export function PolicyFieldHelp({ field }: { field: keyof typeof policyHelp }) {
+export function PolicyFieldHelp({ field, value }: { field: keyof typeof policyHelp; value?: number }) {
   const help = policyHelp[field];
+  const currentExample: Partial<Record<keyof typeof policyHelp, string>> = value === undefined ? {} : {
+    minRestHours: `พักอย่างน้อย ${value} ชั่วโมงระหว่างช่วงทำงานที่แยกจากกัน โดยเวรควบยังต้องผ่านเพดานชั่วโมงต่อเนื่อง`,
+    maxConsecutiveDays: `ทำงานติดกันครบ ${value} วัน ต้องเว้นวันพักก่อนทำงานต่อ`,
+    maxConsecutiveNights: `เวรดึกติดต่อกันต้องไม่เกิน ${value} คืน`,
+    maxConsecutiveOffDays: `OFF ติดต่อกันเกิน ${value} วันจะมีข้อเตือน ไม่รวมการลาที่อนุมัติ`,
+    maxMonthlyHours: `ชั่วโมงทำงานรวมต่อคนในเดือนต้องไม่เกิน ${value} ชั่วโมง`,
+    maxContinuousHours: `ช่วงทำงานต่อเนื่องรวมเวรที่ต่อกันต้องไม่เกิน ${value} ชั่วโมง`,
+    maxDoubleShifts: value === 0 ? "ไม่ให้มีเวรควบ" : `เวรควบต้องไม่เกิน ${value} ครั้งต่อคนในเดือน`,
+    fairnessHours: `ชั่วโมงรวมมากที่สุดกับน้อยที่สุดต่างกันเกิน ${value} ชั่วโมงจะมีข้อเตือน`,
+  };
   return (
     <div id={"policy-" + field + "-help"} className="mt-3 space-y-2 text-sm leading-relaxed text-slate-600">
       <span className={"inline-block rounded-lg px-2 py-1 text-xs font-semibold " + (help.kind === "ข้อบังคับ" ? "bg-rose-50 text-rose-800" : "bg-indigo-50 text-indigo-800")}>{help.kind}</span>
       <p>{help.meaning}</p>
-      <p><strong className="text-slate-700">ตัวอย่าง:</strong> {help.example}</p>
-      <p><strong className="text-slate-700">ผลเมื่อปรับ:</strong> {help.impact}</p>
+      <details><summary className="cursor-pointer text-blue-700">ตัวอย่างและผลเมื่อปรับ</summary><p><strong className="text-slate-700">ตัวอย่าง:</strong> {currentExample[field] ?? help.example}</p>
+      <p><strong className="text-slate-700">ผลเมื่อปรับ:</strong> {help.impact}</p></details>
     </div>
   );
 }
