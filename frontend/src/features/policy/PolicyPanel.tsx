@@ -1,6 +1,5 @@
 "use client";
 import { useState, useMemo } from "react";
-import "./policy.css";
 import {
   Cog6ToothIcon,
   PlusIcon,
@@ -145,7 +144,6 @@ function isStaffingList(value: unknown): value is Staffing[] {
 }
 
 export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPanelProps) {
-  const [section, setSection] = useState("staffing");
   const currentPolicy = roster.policy || {};
   const policyAny = currentPolicy as unknown as { targets?: Target[]; staffing?: Staffing[]; staffingMode?: "legacy" | "weekly"; weeklyStaffing?: WeeklyStaffing[] };
 
@@ -475,7 +473,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
   }, [quotaEditingNurseId, targets]);
 
   return (
-    <fieldset disabled={busy} className="policy-workspace min-w-0 space-y-4" onChangeCapture={() => setSuccessMsg("")}>
+    <fieldset disabled={busy} className="min-w-0 space-y-6" onChangeCapture={() => setSuccessMsg("")}>
       {/* 1. Header Toolbar */}
       <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
@@ -485,7 +483,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold text-slate-900">นโยบายและเงื่อนไขการจัดเวร</h2>
+                <h2 className="text-lg font-bold text-slate-900">ตั้งค่านโยบายและเงื่อนไขการจัดเวร (Roster Policy)</h2>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-indigo-100 text-indigo-800">
                   แผนก {roster.wardId}
                 </span>
@@ -506,10 +504,28 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 <span>← กลับหน้าตารางเวร</span>
               </button>
             )}
-
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={busy}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/20 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {busy ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <span>💾</span>}
+              <span>บันทึกและยืนยันนโยบาย</span>
+            </button>
           </div>
         </div>
 
+        <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-relaxed text-slate-700 space-y-3">
+          <p className="font-bold text-slate-900">เริ่มจากจำนวนคนที่ต้องใช้ → กำหนดขอบเขตการทำงาน → ตั้งเป้าหมายรายคน → ปรับความสำคัญ</p>
+          <p>ค่าตัวอย่างเป็นจุดเริ่มต้นของระบบ ให้เลือกตามนโยบายที่หน่วยงานอนุมัติและจำนวนบุคลากรจริง การเพิ่มจำนวนคนที่ต้องใช้หรือจำกัดเวลาทำงานมากขึ้น อาจทำให้จัดเวรไม่ครบ</p>
+          <nav aria-label="หมวดการตั้งค่านโยบาย" className="flex flex-wrap gap-2">
+            {[["staffing", "1. จำนวนคนต่อผลัด"], ["limits", "2. เวลาทำงานและการพัก"], ["targets", "3. เป้าหมายรายคน"], ["weights", "4. ความสำคัญของเป้าหมาย"], ["review", "5. ตรวจทานก่อนบันทึก"]].map(([id, label]) => (
+              <a key={id} href={"#policy-" + id} className="rounded-xl border border-slate-200 bg-white px-3 py-2 font-medium text-blue-800 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600">{label}</a>
+            ))}
+          </nav>
+          <p className="text-xs">ข้อบังคับ: ถ้าไม่ผ่าน ระบบตรวจเป็นข้อผิดพลาด • เป้าหมาย / ข้อเตือน: ใช้ช่วยเลือกตารางและอาจไม่ตรงค่าที่ตั้ง</p>
+        </div>
         <p role="status" className={"text-sm font-semibold " + (hasChanges ? "text-amber-800" : "text-slate-600")}>
           {hasChanges ? "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก" : "ยังไม่มีการแก้ไขที่รอบันทึก"}
         </p>
@@ -534,21 +550,34 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
           </div>
         )}
 
+        <p className="text-sm text-amber-900 bg-amber-50 rounded-xl p-3">ปุ่มค่าตั้งต้นด้านล่างจะแทนอัตรากำลัง เป้าหมายรายคน โควตา เวลาพัก เพดานชั่วโมง และน้ำหนักหลายค่าในหน้านี้ ต้องตรวจทานและบันทึกอีกครั้ง ไม่ใช่การคำนวณจากภาระงานผู้ป่วย</p>
+        {/* Quick Auto-Set Defaults Banner */}
+        <div className="p-4 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-purple-50/80 border border-blue-200 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <SparklesIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-blue-950">ช่วยตั้งค่าตั้งต้นจากจำนวนบุคลากร</div>
+              <div className="text-[11px] text-blue-700 mt-0.5">
+                มีบุคลากรใช้งาน {activeStaff.length} คน (RN: {rnStaff.length} คน, PN: {pnStaff.length} คน, หัวหน้าเวร: {activeStaff.filter(n => n.leader).length} คน)
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSetDefaultsFromStaff}
+            disabled={busy}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <SparklesIcon className="w-4 h-4" />
+            <span>ใช้ค่าตั้งต้นจากทีม</span>
+          </button>
+        </div>
       </div>
 
-      <div className="policy-layout">
-        <nav aria-label="หมวดการตั้งค่านโยบาย" className="policy-nav">
-          <p className="font-semibold text-slate-900">ตั้งค่าการจัดเวร</p>
-          <p className="text-xs text-slate-500">เริ่มที่จำนวนคน แล้วตรวจทานก่อนบันทึก</p>
-          {[["staffing", "1. จำนวนคนต่อเวร", `${staffingList.length} ช่วงเวลา`], ["limits", "2. เวลาทำงานและการพัก", `พักอย่างน้อย ${minRestHours} ชม.`], ["targets", "3. เป้าหมายบุคลากร", `${targets.length} คน · แยก RN / PN`], ["weights", "4. ตั้งค่าขั้นสูง", "น้ำหนักและค่าตั้งต้น"], ["review", "5. ตรวจทานก่อนบันทึก", hasChanges ? "มีค่าที่รอบันทึก" : "ยังไม่มีการแก้ไข"]].map(([id, label, summary]) => (
-            <button key={id} type="button" aria-current={section === id ? "step" : undefined} aria-controls={"policy-" + id} onClick={() => setSection(id)} className={section === id ? "is-active" : ""}>
-              <span>{label}</span><small>{summary}</small>
-            </button>
-          ))}
-        </nav>
-        <div className="policy-content">
       {/* 2. Staffing Requirements (Section 1) */}
-      <div id="policy-staffing" hidden={section !== "staffing"} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
+      <div id="policy-staffing" className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <UsersIcon className="w-5 h-5 text-blue-600" />
@@ -571,7 +600,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 ผลัด 12 ชม.
               </button>
             </div>
-            <details className="policy-technical"><summary>กฎเฉพาะวันที่ / ทักษะ (ขั้นสูง)</summary><div className="flex items-center gap-2">
+            <div className="flex items-center bg-slate-100 rounded-xl p-1 text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => handleSwitchMode("visual")}
@@ -587,11 +616,10 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 <CodeBracketIcon className="w-3.5 h-3.5 inline mr-1" />
                 ขั้นสูง: JSON
               </button>
-            </div></details>
+            </div>
           </div>
         </div>
 
-<<<<<<< HEAD
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button type="button" onClick={() => setScheduleMode("legacy")} className={"rounded-2xl border p-4 text-left " + (scheduleMode === "legacy" ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white")}>
             <span className="block font-bold text-slate-900">รูปแบบเดิม</span><span className="text-sm text-slate-600">ใช้จำนวนเดียวกันทุกวัน และข้อยกเว้นเฉพาะวันที่</span>
@@ -636,38 +664,150 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
             <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">จำนวนในรูปแบบนี้ต้องได้พอดี หากมีเวรล็อกหรือข้อจำกัดทำให้ขาดหรือเกิน ระบบจะแสดงข้อผิดพลาดก่อนอนุมัติ</p>
           </div>
         ) : staffingMode === "visual" ? (
-=======
-        <div id="policy-staffing-help" className="policy-help"><p>จำนวนขั้นต่ำต่อช่วงเวลา • RN ปฏิบัติงานไม่รวมหัวหน้าเวร • รวมคน = RN + หัวหน้าเวร + PN</p><details><summary>วิธีนับคนและเลือกเวลาข้ามวัน</summary>          <p><strong>ข้อบังคับ • จำนวนขั้นต่ำตลอดช่วงเวลา</strong> เลือกช่วงที่ต้องมีคนปฏิบัติงานจริง การเพิ่มจำนวนทำให้ต้องใช้บุคลากรมากขึ้น และอาจเหลือเวรที่จัดไม่ได้</p>
-          <p><strong>RN ไม่นับรวมหัวหน้าในช่องนี้:</strong> RN 2 + หัวหน้า 1 = ต้องมี RN รวม 3 คน และมีผู้เป็นหัวหน้าอย่างน้อย 1 คน หากเพิ่ม PN 1 จะต้องใช้รวม 4 คน</p>
-          <p><strong>เวลาเริ่ม / สิ้นสุด:</strong> เช่น 20.00–08.00 ให้เลือก 08.00 วันถัดไป ส่วน 16.00–เที่ยงคืนให้เลือก 24.00 ปุ่มตัวอย่างผลัดจะแทนรายการทั้งหมดด้านล่าง</p>
-          <p>RN = พยาบาลวิชาชีพ • PN = ผู้ช่วยพยาบาล • หัวหน้า = ผู้มีคุณสมบัติหัวหน้าเวร • ใส่ 0 หากไม่ต้องการตำแหน่งนั้น</p>
-</details></div>
-        {staffingMode === "visual" ? (
->>>>>>> Phase_4_Lean
           <div className="space-y-3">
-            <div className="overflow-x-auto">
-              <table className="policy-staffing-table">
-                <caption className="sr-only">จำนวนบุคลากรขั้นต่ำต่อเวร</caption>
-                <thead><tr><th>ช่วงเวลา</th><th>เริ่ม</th><th>สิ้นสุด</th><th>RN ปฏิบัติงาน</th><th>หัวหน้าเวร (RN)</th><th>PN</th><th>รวมคน</th><th><span className="sr-only">ลบ</span></th></tr></thead>
-                <tbody>{staffingList.map((item, index) => (
-                  <tr key={index}>
-                    <td><strong>ผลัดที่ {index + 1}</strong><small>{(item.end - item.start) / 60} ชม. · {item.date || "ทุกวัน"}</small>
-                      {Object.keys(item.skills ?? {}).length > 0 && <small>ทักษะ: {Object.entries(item.skills ?? {}).map(([skill, count]) => skill + " " + count + " คน").join(" • ")}</small>}
-                    </td>
-                    {(["start", "end"] as const).map(key => <td key={key}>
-                      <select aria-label={(key === "start" ? "เวลาเริ่ม" : "เวลาสิ้นสุด") + " ผลัดที่ " + (index + 1)} aria-describedby="policy-staffing-help" value={item[key]} onChange={e => handleUpdateStaffingRow(index, { [key]: Number(e.target.value) })}>
-                        {COMMON_TIME_OPTIONS.filter(opt => key === "end" || opt.mins < 1440).map(opt => <option key={opt.mins} value={opt.mins}>{minsToTimeString(opt.mins)}{opt.mins >= 1440 ? " วันถัดไป" : ""}</option>)}
-                        {!COMMON_TIME_OPTIONS.some(opt => opt.mins === item[key]) && <option value={item[key]}>{formatThaiTimeLabel(item[key])}</option>}
-                      </select>
-                      {key === "end" && item.end <= item.start && <small role="alert" className="text-rose-700">สิ้นสุดต้องอยู่หลังเวลาเริ่ม</small>}
-                    </td>)}
-                    {(["rn", "leaders", "pn"] as const).map(key => <td key={key}><input type="number" min="0" max={key === "leaders" ? 10 : 20} aria-label={({ rn: "RN ไม่รวมหัวหน้า", leaders: "หัวหน้าเวร", pn: "PN" }[key]) + " ผลัดที่ " + (index + 1)} aria-describedby="policy-staffing-help" value={item[key]} onChange={e => handleUpdateStaffingRow(index, { [key]: Math.max(0, Number(e.target.value)) })} /></td>)}
-                    <td><strong className="text-blue-800">{item.rn + item.leaders + item.pn} คน</strong><small>RN {item.rn + item.leaders} + PN {item.pn}</small><span className="sr-only">ต้องมี RN รวม {item.rn + item.leaders} คน + PN {item.pn} คน = {item.rn + item.leaders + item.pn} คน</span></td>
-                    <td><button type="button" aria-label={"ลบผลัดที่ " + (index + 1)} onClick={() => handleRemoveStaffingRow(index)} className="p-2 text-slate-500 hover:text-rose-600"><TrashIcon className="h-4 w-4" /></button></td>
-                  </tr>
-                ))}</tbody>
-              </table>
-              {staffingList.length === 0 && <p className="p-4 text-sm text-slate-500">ยังไม่มีช่วงเวลาเวร กดเพิ่มช่วงเวลาเวรด้านล่าง</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+              {staffingList.map((item, index) => {
+                const hoursDuration = (item.end - item.start) / 60;
+
+                return (
+                  <div key={index} className="p-4 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-3 shadow-2xs hover:border-blue-300 transition">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 text-xs font-black flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <div>
+                          <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                            <span>{hoursDuration === 8 ? "ผลัด 8 ชม." : hoursDuration === 12 ? "ผลัด 12 ชม." : `ผลัด ${hoursDuration} ชม.`}</span>
+                            {item.end >= 1440 && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded">
+                                ข้ามวัน (+1)
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] font-medium text-blue-700">
+                            {formatThaiSpoken(item.start)} ({minsToTimeString(item.start)} น.) → {formatThaiSpoken(item.end)} ({minsToTimeString(item.end)} น.{item.end >= 1440 ? " วันถัดไป" : ""})
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveStaffingRow(index)}
+                        className="text-slate-400 hover:text-rose-600 transition p-1 rounded-lg hover:bg-rose-50 cursor-pointer"
+                        title="ลบช่วงเวลานี้"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <p className="text-sm font-medium text-slate-700">{item.date ? "เฉพาะวันที่ " + item.date : "ใช้ทุกวัน (ยกเว้นวันที่มีกฎเฉพาะช่วงเวลาเดียวกัน)"}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                          ⏰ เวลาเริ่ม (Start Time):
+                        </label>
+                        <select
+                          aria-label={"เวลาเริ่ม ผลัดที่ " + (index + 1)}
+                          aria-describedby="policy-staffing-help"
+                          value={item.start}
+                          onChange={(e) => handleUpdateStaffingRow(index, { start: Number(e.target.value) })}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                        >
+                          {COMMON_TIME_OPTIONS.filter((opt) => opt.mins < 1440).map((opt) => (
+                            <option key={opt.mins} value={opt.mins}>
+                              {opt.label}
+                            </option>
+                          ))}
+                          {!COMMON_TIME_OPTIONS.some((opt) => opt.mins === item.start) && (
+                            <option value={item.start}>
+                              {formatThaiTimeLabel(item.start)}
+                            </option>
+                          )}
+                        </select>
+                        <div className="mt-1 px-2 py-0.5 bg-blue-50/80 border border-blue-100 rounded-lg text-[10px] font-bold text-blue-800 flex items-center justify-between">
+                          <span>☀️ {formatThaiSpoken(item.start)}</span>
+                          <span className="font-mono text-slate-500">{minsToTimeString(item.start)} น.</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-1">
+                          ⏰ เวลาสิ้นสุด (End Time):
+                        </label>
+                        <select
+                          aria-label={"เวลาสิ้นสุด ผลัดที่ " + (index + 1)}
+                          aria-describedby="policy-staffing-help"
+                          value={item.end}
+                          onChange={(e) => handleUpdateStaffingRow(index, { end: Number(e.target.value) })}
+                          className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                        >
+                          {COMMON_TIME_OPTIONS.map((opt) => (
+                            <option key={opt.mins} value={opt.mins}>
+                              {opt.label}
+                            </option>
+                          ))}
+                          {!COMMON_TIME_OPTIONS.some((opt) => opt.mins === item.end) && (
+                            <option value={item.end}>
+                              {formatThaiTimeLabel(item.end, item.end >= 1440)}
+                            </option>
+                          )}
+                        </select>
+                        <div className="mt-1 px-2 py-0.5 bg-indigo-50/80 border border-indigo-100 rounded-lg text-[10px] font-bold text-indigo-800 flex items-center justify-between">
+                          <span>🌙 {formatThaiSpoken(item.end)}</span>
+                          <span className="font-mono text-slate-500">
+                            {minsToTimeString(item.end)} น.{item.end >= 1440 ? " (วันถัดไป)" : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/80 text-center">
+                      <div className="bg-white p-2 rounded-xl border border-blue-100">
+                        <span className="block text-[10px] font-bold text-blue-700 mb-1">RN ไม่รวมหัวหน้า</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="20"
+                          aria-label={"RN ไม่รวมหัวหน้า ผลัดที่ " + (index + 1)}
+                          aria-describedby="policy-staffing-help"
+                          value={item.rn}
+                          onChange={(e) => handleUpdateStaffingRow(index, { rn: Math.max(0, Number(e.target.value)) })}
+                          className="w-full text-center bg-blue-50/50 border border-blue-200 rounded-lg py-1 text-xs font-black text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="bg-white p-2 rounded-xl border border-emerald-100">
+                        <span className="block text-[10px] font-bold text-emerald-700 mb-1">PN (ผู้ช่วย)</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="20"
+                          aria-label={"PN ผลัดที่ " + (index + 1)}
+                          aria-describedby="policy-staffing-help"
+                          value={item.pn}
+                          onChange={(e) => handleUpdateStaffingRow(index, { pn: Math.max(0, Number(e.target.value)) })}
+                          className="w-full text-center bg-emerald-50/50 border border-emerald-200 rounded-lg py-1 text-xs font-black text-emerald-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="bg-white p-2 rounded-xl border border-amber-100">
+                        <span className="block text-[10px] font-bold text-amber-700 mb-1">หัวหน้าเวร</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="10"
+                          aria-label={"หัวหน้าเวร ผลัดที่ " + (index + 1)}
+                          aria-describedby="policy-staffing-help"
+                          value={item.leaders}
+                          onChange={(e) => handleUpdateStaffingRow(index, { leaders: Math.max(0, Number(e.target.value)) })}
+                          className="w-full text-center bg-amber-50/50 border border-amber-200 rounded-lg py-1 text-xs font-black text-amber-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <p className="rounded-xl bg-blue-50 p-2 text-sm font-semibold text-blue-900">ต้องมี RN รวม {item.rn + item.leaders} คน + PN {item.pn} คน = {item.rn + item.leaders + item.pn} คน</p>
+                    {item.end <= item.start && <p role="alert" className="text-sm text-rose-700">เวลาสิ้นสุดต้องอยู่หลังเวลาเริ่ม หากข้ามคืนให้เลือกวันถัดไป</p>}
+                    {Object.keys(item.skills ?? {}).length > 0 && <p className="text-xs text-slate-600">ทักษะขั้นต่ำ: {Object.entries(item.skills ?? {}).map(([skill, count]) => skill + " " + count + " คน").join(" • ")} (แก้ไขในโหมดขั้นสูง)</p>}
+                  </div>
+                );
+              })}
             </div>
 
             <button
@@ -695,14 +835,13 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
       </div>
 
       {/* 3. Hard Constraints & Soft Weights (Section 2 - 2 Columns) */}
-      <div hidden={section !== "limits"} className="space-y-6">
+      <div className="space-y-6">
         {/* Hard Constraints */}
-        <div id="policy-limits" hidden={section !== "limits"} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
+        <div id="policy-limits" className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
             <ShieldCheckIcon className="w-5 h-5 text-rose-600" />
             <h3 className="text-base font-bold text-slate-800">2. ขอบเขตเวลาทำงานและการพัก</h3>
           </div>
-          <p className="text-sm text-slate-600">ข้อบังคับที่ตารางต้องผ่านทุกข้อ • เลือกตามนโยบายที่หน่วยงานอนุมัติ</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
@@ -719,7 +858,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="minRestHours" value={minRestHours} />
+              <PolicyFieldHelp field="minRestHours" />
             </div>
 
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
@@ -735,7 +874,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="maxConsecutiveDays" value={maxConsecutiveDays} />
+              <PolicyFieldHelp field="maxConsecutiveDays" />
             </div>
 
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
@@ -751,10 +890,24 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="maxConsecutiveNights" value={maxConsecutiveNights} />
+              <PolicyFieldHelp field="maxConsecutiveNights" />
             </div>
 
-
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+              <label htmlFor="policy-maxConsecutiveOffDays" className="block text-sm font-bold text-slate-700 mb-2">วันหยุดประจำ (OFF) ต่อเนื่องสูงสุด (วัน):</label>
+              <input
+                type="number"
+                min="1"
+                max="14"
+                id="policy-maxConsecutiveOffDays"
+                aria-describedby="policy-maxConsecutiveOffDays-help"
+                value={maxConsecutiveOffDays}
+                onChange={(e) => setMaxConsecutiveOffDays(Number(e.target.value))}
+                disabled={busy}
+                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <PolicyFieldHelp field="maxConsecutiveOffDays" />
+            </div>
 
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
               <label htmlFor="policy-maxMonthlyHours" className="block text-sm font-bold text-slate-700 mb-2">ชั่วโมงรวมสูงสุด/เดือน (ชม.):</label>
@@ -769,7 +922,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="maxMonthlyHours" value={maxMonthlyHours} />
+              <PolicyFieldHelp field="maxMonthlyHours" />
             </div>
 
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
@@ -785,7 +938,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="maxContinuousHours" value={maxContinuousHours} />
+              <PolicyFieldHelp field="maxContinuousHours" />
             </div>
 
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
@@ -801,26 +954,10 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="maxDoubleShifts" value={maxDoubleShifts} />
+              <PolicyFieldHelp field="maxDoubleShifts" />
             </div>
           </div>
 
-          <h4 className="text-sm font-bold text-slate-800">แนวทางและข้อเตือน — ไม่ใช่ข้อบังคับ</h4>
-            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
-              <label htmlFor="policy-maxConsecutiveOffDays" className="block text-sm font-bold text-slate-700 mb-2">วันหยุดประจำ (OFF) ต่อเนื่องสูงสุด (วัน):</label>
-              <input
-                type="number"
-                min="1"
-                max="14"
-                id="policy-maxConsecutiveOffDays"
-                aria-describedby="policy-maxConsecutiveOffDays-help"
-                value={maxConsecutiveOffDays}
-                onChange={(e) => setMaxConsecutiveOffDays(Number(e.target.value))}
-                disabled={busy}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <PolicyFieldHelp field="maxConsecutiveOffDays" value={maxConsecutiveOffDays} />
-            </div>
           <h4 className="text-sm font-bold text-slate-800">ตัวเลือกเมื่อคนไม่พอ</h4>
           {/* Dynamic OFF Compression & Auto-OT Toggles */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-3 border-t border-slate-100">
@@ -865,7 +1002,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
       </div>
 
       {/* Individual targets */}
-      <div id="policy-targets" hidden={section !== "targets"} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+      <div id="policy-targets" className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center font-black">
@@ -923,14 +1060,12 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
           </div>
         </div>
 
-        <div id="policy-target-help" className="policy-help"><p>ตั้งค่าทั้งกลุ่มก่อน แล้วปรับเฉพาะรายคน • เป้าหมายใช้เป็นแนวทาง ไม่ใช่เพดานห้ามเกิน</p><details><summary>ความหมายของเป้าหมายและโควตาเวร</summary>          <p><strong>ชั่วโมงเป้าหมาย:</strong> จำนวนชั่วโมงที่อยากให้แต่ละคนทำในเดือน เช่น 160 ชม. เทียบได้กับ 20 เวรที่ยาว 8 ชม. หากไม่ตรงจะเป็นข้อเตือน ไม่ใช่เพดานห้ามเกิน</p>
+        <div id="policy-target-help" className="rounded-2xl bg-blue-50 p-4 text-sm leading-relaxed text-blue-950 space-y-2">
+          <p><strong>ชั่วโมงเป้าหมาย:</strong> จำนวนชั่วโมงที่อยากให้แต่ละคนทำในเดือน เช่น 160 ชม. เทียบได้กับ 20 เวรที่ยาว 8 ชม. หากไม่ตรงจะเป็นข้อเตือน ไม่ใช่เพดานห้ามเกิน</p>
           <p><strong>วัน OFF เป้าหมาย:</strong> จำนวนวันหยุดที่ต้องการ ระบบเตือนทั้งเมื่อมากกว่าหรือน้อยกว่าเป้าหมาย ส่วนวัน OFF ขั้นต่ำสำหรับบุคลากรประจำที่บังคับใช้ขณะนี้คือ {currentPolicy.minOff ?? 0} วัน</p>
           <p><strong>โควตาเวร:</strong> จำนวนครั้งที่ต้องการของเวรแต่ละรหัส เช่น ดึก 4 ครั้ง หากได้ 3 หรือ 5 ครั้งจะมีข้อเตือน ช่องว่างหมายถึงไม่ตั้งเป้าหมาย ส่วน 0 หมายถึงเป้าหมาย 0 ครั้ง ไม่ใช่คำสั่งห้ามเวร</p>
           <p><strong>ตั้งค่าด่วน RN / PN:</strong> ใส่ชั่วโมงและ OFF แล้วกดกำหนดให้ทั้งกลุ่ม จากนั้นปรับรายคนที่มีเงื่อนไขต่างกัน ปุ่มนี้มีผลต่อทุกคนในกลุ่ม แม้กำลังค้นหารายชื่ออยู่ และยังต้องกดบันทึกนโยบาย</p>
-</details></div>
-        <p className="text-sm text-slate-700">เพดานทำงานรายคน <strong>{maxMonthlyHours} ชม./เดือน</strong> · วัน OFF ขั้นต่ำ {currentPolicy.minOff ?? 0} วัน</p>
-        {targets.some(t => t.hours > maxMonthlyHours) && <p role="alert" className="text-sm text-amber-800">มีชั่วโมงเป้าหมายสูงกว่าเพดานรายเดือน กรุณาทบทวนรายคน</p>}
-        {displayedStaff.length === 0 && <p className="p-4 text-slate-500">ไม่พบรายชื่อที่ตรงกับการค้นหา</p>}
+        </div>
         {/* GROUP 1: RN Registered Nurses (Card) */}
         {(targetTab === "all" || targetTab === "rn") && (
           <div className="p-5 bg-gradient-to-r from-blue-50/50 via-white to-blue-50/30 border border-blue-200 rounded-3xl space-y-4 shadow-2xs">
@@ -946,10 +1081,10 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
               </div>
 
               {/* Quick Batch for RN */}
-              <div className="policy-bulk flex items-center gap-3 flex-wrap text-sm">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className="text-[11px] font-bold text-blue-900">⚡ ตั้งค่าด่วนเฉพาะ RN:</span>
                 <div className="flex items-center gap-1">
-                  <span className="text-sm text-slate-600">ชั่วโมงเป้าหมาย:</span>
+                  <span className="text-[10px] text-slate-500">ชม:</span>
                   <input
                     type="number"
                     aria-label="ชั่วโมงเป้าหมาย ทั้งกลุ่ม RN"
@@ -958,7 +1093,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                     onChange={(e) => setBulkHoursRN(Number(e.target.value))}
                     className="w-16 bg-white border border-blue-300 rounded-lg px-2 py-0.5 text-xs text-center font-bold text-blue-950"
                   />
-                  <span className="text-sm text-slate-600">วันหยุด:</span>
+                  <span className="text-[10px] text-slate-500">OFF:</span>
                   <input
                     type="number"
                     aria-label="วัน OFF เป้าหมาย ทั้งกลุ่ม RN"
@@ -1101,10 +1236,10 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
               </div>
 
               {/* Quick Batch for PN */}
-              <div className="policy-bulk flex items-center gap-3 flex-wrap text-sm">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
                 <span className="text-[11px] font-bold text-emerald-900">⚡ ตั้งค่าด่วนเฉพาะ PN:</span>
                 <div className="flex items-center gap-1">
-                  <span className="text-sm text-slate-600">ชั่วโมงเป้าหมาย:</span>
+                  <span className="text-[10px] text-slate-500">ชม:</span>
                   <input
                     type="number"
                     aria-label="ชั่วโมงเป้าหมาย ทั้งกลุ่ม PN"
@@ -1113,7 +1248,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                     onChange={(e) => setBulkHoursPN(Number(e.target.value))}
                     className="w-16 bg-white border border-emerald-300 rounded-lg px-2 py-0.5 text-xs text-center font-bold text-emerald-950"
                   />
-                  <span className="text-sm text-slate-600">วันหยุด:</span>
+                  <span className="text-[10px] text-slate-500">OFF:</span>
                   <input
                     type="number"
                     aria-label="วัน OFF เป้าหมาย ทั้งกลุ่ม PN"
@@ -1231,36 +1366,10 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
       </div>
 
         {/* Soft Weights */}
-        <div id="policy-weights" hidden={section !== "weights"} className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
-          <p className="text-sm text-slate-600">ใช้ค่าเดิมได้ หากหน่วยงานยังไม่มีข้อกำหนดให้ปรับน้ำหนัก</p>
-          <details className="policy-help"><summary>เริ่มใหม่ด้วยค่าตั้งต้นจากทีม</summary>        <p className="text-sm text-amber-900 bg-amber-50 rounded-xl p-3">ปุ่มค่าตั้งต้นด้านล่างจะแทนอัตรากำลัง เป้าหมายรายคน โควตา เวลาพัก เพดานชั่วโมง และน้ำหนักหลายค่าในหน้านี้ ต้องตรวจทานและบันทึกอีกครั้ง ไม่ใช่การคำนวณจากภาระงานผู้ป่วย</p>
-        {/* Quick Auto-Set Defaults Banner */}
-        <div className="p-4 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-purple-50/80 border border-blue-200 rounded-2xl flex items-center justify-between flex-wrap gap-3 shadow-2xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-              <SparklesIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-blue-950">ช่วยตั้งค่าตั้งต้นจากจำนวนบุคลากร</div>
-              <div className="text-[11px] text-blue-700 mt-0.5">
-                มีบุคลากรใช้งาน {activeStaff.length} คน (RN: {rnStaff.length} คน, PN: {pnStaff.length} คน, หัวหน้าเวร: {activeStaff.filter(n => n.leader).length} คน)
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => { if (window.confirm("แทนค่าในแบบฟอร์มด้วยค่าตั้งต้นจากทีม?\nจะเปลี่ยนอัตรากำลัง เป้าหมายทุกคนเป็น 160 ชม. / OFF 8 วัน ล้างโควตา และคืนค่าเวลาพัก เพดานชั่วโมงกับน้ำหนัก\nยังไม่บันทึกจนกดยืนยันนโยบาย")) handleSetDefaultsFromStaff(); }}
-            disabled={busy}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-          >
-            <SparklesIcon className="w-4 h-4" />
-            <span>ใช้ค่าตั้งต้นจากทีม</span>
-          </button>
-        </div>
-</details>
+        <div id="policy-weights" className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
             <ScaleIcon className="w-5 h-5 text-indigo-600" />
-            <h3 className="text-base font-bold text-slate-800">4. ตั้งค่าขั้นสูง</h3>
+            <h3 className="text-base font-bold text-slate-800">4. ให้ความสำคัญกับเรื่องใดในการจัดเวร</h3>
           </div>
           <p className="text-sm leading-relaxed text-slate-600">น้ำหนัก 0–1000 เป็นสัดส่วนความสำคัญในการประเมินตาราง ไม่ใช่เปอร์เซ็นต์และไม่ต้องรวมได้ 100 หากยังไม่แน่ใจให้คงค่าเดิม การเพิ่มน้ำหนักไม่ทำให้ระบบข้ามข้อบังคับ และไม่ได้รับประกันว่าจะได้ตรงทุกเป้าหมาย หากตั้งทุกน้ำหนักเป็น 0 คะแนนรวมจะเฉลี่ยทั้ง 4 ด้านเท่ากัน</p>
 
@@ -1342,22 +1451,19 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
                 disabled={busy}
                 className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <PolicyFieldHelp field="fairnessHours" value={fairnessHours} />
+              <PolicyFieldHelp field="fairnessHours" />
             </div>
           </div>
         </div>
 
-      <section id="policy-review" hidden={section !== "review"} className="rounded-3xl border border-blue-200 bg-blue-50 p-5 space-y-3 text-sm text-blue-950">
+      <section id="policy-review" className="rounded-3xl border border-blue-200 bg-blue-50 p-5 space-y-3 text-sm text-blue-950">
         <h3 className="font-bold">5. ตรวจทานก่อนบันทึก</h3>
-        {staffingMode === "json" ? <p className="text-amber-900">กำลังใช้ข้อมูล JSON กรุณาตรวจอัตรากำลังในหมวดจำนวนคนก่อนบันทึก</p> : <div className="rounded-xl bg-white p-4 space-y-2"><h4 className="font-semibold">จำนวนคนขั้นต่ำต่อเวร</h4>{staffingList.map((item, i) => <p key={i}>{minsToTimeString(item.start)}–{minsToTimeString(item.end)}{item.end >= 1440 ? " วันถัดไป" : ""} · {item.date || "ทุกวัน"} · RN {item.rn} + หัวหน้า {item.leaders} + PN {item.pn} = <strong>{item.rn + item.leaders + item.pn} คน</strong></p>)}</div>}
         <p>พักอย่างน้อย <strong>{minRestHours} ชม.</strong> • ทำงานติดกันไม่เกิน <strong>{maxConsecutiveDays} วัน</strong> • ดึกติดกันไม่เกิน <strong>{maxConsecutiveNights} คืน</strong></p>
         <p>เพดานรายคน <strong>{maxMonthlyHours} ชม./เดือน</strong> • ทำงานต่อเนื่องไม่เกิน <strong>{maxContinuousHours} ชม.</strong> • เวรควบไม่เกิน <strong>{maxDoubleShifts} ครั้ง/เดือน</strong></p>
         <p>เป้าหมายรายคน {targets.length} คน • น้ำหนัก: กำลังคน {wCoverage} / ความสมดุล {wFairness} / คำขอเวร {wPreference} / คงตารางเดิม {wStability}</p>
         {targets.some(t => t.hours > maxMonthlyHours) && <p role="alert" className="font-semibold text-amber-900">มีเป้าหมายชั่วโมงรายคนสูงกว่าเพดานรายเดือน ควรทบทวนเป้าหมายให้สอดคล้องกัน</p>}
         <p>การบันทึกจะยืนยันนโยบายของแผนก {roster.wardId} สำหรับใช้ตรวจตารางและจัดเวรครั้งถัดไป ไม่ได้สร้างหรือเปลี่ยนเวรที่ลงไว้ให้อัตโนมัติ</p>
       </section>
-        </div>
-      </div>
       {/* 5. Sticky Bottom Action Bar */}
       <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-lg flex items-center justify-between flex-wrap gap-3 sticky bottom-4">
         <div className="text-xs text-slate-500 font-medium">
@@ -1376,13 +1482,12 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
           )}
           <button
             type="button"
-            aria-label={section === "review" ? "บันทึกและยืนยันนโยบาย" : "ตรวจทานก่อนบันทึก"}
-            onClick={() => section === "review" ? handleSave() : setSection("review")}
+            onClick={handleSave}
             disabled={busy}
             className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-md shadow-blue-600/25 flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {busy ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <span>💾</span>}
-            <span>{section === "review" ? "บันทึกและยืนยันนโยบาย" : "ตรวจทานก่อนบันทึก"}</span>
+            <span>บันทึกและยืนยันนโยบาย</span>
           </button>
         </div>
       </div>
