@@ -121,6 +121,8 @@ type Job = {
 
 function canApplyJob(job: Job | null): boolean {
   if (!job || job.status !== "completed" || job.applied || job.stale || job.simulation || !job.result) return false;
+  const shortages = job.result.diagnostics?.remainingShortages ?? job.result.diagnostics?.shortages ?? [];
+  if (shortages.some((item) => item.missing > 0) && job.result.assignments.every((cell) => !cell.shiftCode || cell.shiftCode === "X" || cell.shiftCode === "L")) return false;
   return job.result.status === "complete" ||
     job.result.diagnostics?.regularSearchStatus === "search_incomplete" ||
     job.result.diagnostics?.regularSearchStatus === "minimum_shortage_proven";
@@ -393,8 +395,21 @@ export function SolverPanel({ roster, token, wardName, onApplied, onRosterUpdate
           const maxCapPN = activePN * (daysInMonth - minOff);
 
           const defaultStaffing = roster.policy?.staffing?.filter((s) => !s.date) || [];
-          const dailyReqRN = defaultStaffing.reduce((acc, s) => acc + (s.rn || 0) + (s.leaders || 0), 0);
-          const dailyReqPN = defaultStaffing.reduce((acc, s) => acc + (s.pn || 0), 0);
+          let dailyReqRN: number;
+          let dailyReqPN: number;
+
+          if (roster.policy?.staffingMode === "weekly" && roster.policy.weeklyStaffing?.length) {
+            // weekly mode: รวม RN/PN จากทุก slot ของทุกวัน แล้วเฉลี่ยเป็นรายวัน
+            const totalSlots = roster.policy.weeklyStaffing.length;
+            const slotsPerDay = totalSlots / 7;
+            const totalRN = roster.policy.weeklyStaffing.reduce((acc, s) => acc + (s.rn || 0) + (s.leaders || 0), 0);
+            const totalPN = roster.policy.weeklyStaffing.reduce((acc, s) => acc + (s.pn || 0), 0);
+            dailyReqRN = Math.round((totalRN / 7) * slotsPerDay);
+            dailyReqPN = Math.round((totalPN / 7) * slotsPerDay);
+          } else {
+            dailyReqRN = defaultStaffing.reduce((acc, s) => acc + (s.rn || 0) + (s.leaders || 0), 0);
+            dailyReqPN = defaultStaffing.reduce((acc, s) => acc + (s.pn || 0), 0);
+          }
           const monthlyReqRN = dailyReqRN * daysInMonth;
           const monthlyReqPN = dailyReqPN * daysInMonth;
 
@@ -1049,7 +1064,7 @@ export function SolverPanel({ roster, token, wardName, onApplied, onRosterUpdate
                 </div>
               </div>
 
-              <p className="font-medium">เวรที่ยังขาด {(job.result.diagnostics?.remainingShortages ?? job.result.diagnostics?.shortages ?? []).reduce((sum, item) => sum + item.missing, 0)} เวร · ข้อผิดพลาด {job.result.violations.filter(v => v.severity === "error").length} รายการ</p>
+              {job.result.assignments.every((cell) => !cell.shiftCode || cell.shiftCode === "X" || cell.shiftCode === "L") && (job.result.diagnostics?.remainingShortages ?? job.result.diagnostics?.shortages ?? []).some((item) => item.missing > 0) && <p role="alert" className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-sm font-semibold text-rose-800">รอบนี้ยังจัดบุคลากรขึ้นเวรไม่ได้เลย จึงบันทึกผลนี้ลงตารางไม่ได้ ตรวจจำนวนเวรที่ขาดและสาเหตุรายวันด้านล่าง แล้วจัดใหม่</p>}`r`n              <p className="font-medium">เวรที่ยังขาด {(job.result.diagnostics?.remainingShortages ?? job.result.diagnostics?.shortages ?? []).reduce((sum, item) => sum + item.missing, 0)} เวร · ข้อผิดพลาด {job.result.violations.filter(v => v.severity === "error").length} รายการ</p>
               <details className="rounded-lg border border-slate-200 p-3">
                 <summary className="cursor-pointer font-medium">รายละเอียดคะแนนการวิเคราะห์</summary>
               {/* Score Cards */}

@@ -20,6 +20,8 @@ import type { Roster, RosterResponse } from "@/types/schedule";
 
 type Target = { nurseId: string; hours: number; off: number; quotas: Record<string, number> };
 type Staffing = { date: string; start: number; end: number; rn: number; pn: number; leaders: number; skills: Record<string, number> };
+type WeeklyStaffing = Omit<Staffing, "date"> & { weekday: number };
+const WEEKDAYS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์"];
 
 interface PolicyPanelProps {
   roster: Roster;
@@ -143,7 +145,7 @@ function isStaffingList(value: unknown): value is Staffing[] {
 
 export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPanelProps) {
   const currentPolicy = roster.policy || {};
-  const policyAny = currentPolicy as unknown as { targets?: Target[]; staffing?: Staffing[] };
+  const policyAny = currentPolicy as unknown as { targets?: Target[]; staffing?: Staffing[]; staffingMode?: "legacy" | "weekly"; weeklyStaffing?: WeeklyStaffing[] };
 
   // 1. Hard Constraints
   const [minRestHours, setMinRestHours] = useState(currentPolicy.minRestHours ?? 8);
@@ -168,6 +170,15 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
   const [staffingJson, setStaffingJson] = useState(() =>
     JSON.stringify(policyAny.staffing && policyAny.staffing.length > 0 ? policyAny.staffing : DEFAULT_3_SHIFTS, null, 2)
   );
+  const [scheduleMode, setScheduleMode] = useState<"legacy" | "weekly">(policyAny.staffingMode === "weekly" ? "weekly" : "legacy");
+  const [weeklyStaffing, setWeeklyStaffing] = useState<WeeklyStaffing[]>(() => {
+    if (policyAny.weeklyStaffing?.length) return policyAny.weeklyStaffing;
+    const base = policyAny.staffing?.filter((item) => !item.date);
+    const template = base?.length ? base : DEFAULT_3_SHIFTS;
+    return WEEKDAYS.flatMap((_, index) => template.map((item) => ({
+      weekday: index + 1, start: item.start, end: item.end, rn: item.rn, pn: item.pn, leaders: item.leaders, skills: { ...item.skills },
+    })));
+  });
 
   // 3. Soft Weights
   const [wCoverage, setWCoverage] = useState(currentPolicy.weights?.coverage ?? 100);
@@ -201,7 +212,7 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
   const formSignature = JSON.stringify({ minRestHours, maxConsecutiveDays, maxConsecutiveNights,
     maxConsecutiveOffDays, compressOffOnShortage, allowOTOnShortage, maxMonthlyHours,
     maxContinuousHours, maxDoubleShifts, fairnessHours, wCoverage, wFairness, wPreference,
-    wStability, targets, staffing: staffingMode === "json" ? staffingJson : JSON.stringify(staffingList, null, 2) });
+    wStability, targets, scheduleMode, weeklyStaffing, staffing: staffingMode === "json" ? staffingJson : JSON.stringify(staffingList, null, 2) });
   const [savedSignature, setSavedSignature] = useState(formSignature);
   const hasChanges = savedSignature !== formSignature;
 
@@ -302,8 +313,23 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
     syncListToJson(updated);
   }
 
+  function handleUpdateWeekly(index: number, field: "rn" | "pn" | "leaders", value: number) {
+    setWeeklyStaffing((current) => current.map((item, i) => i === index ? { ...item, [field]: Math.max(0, Math.trunc(value || 0)) } : item));
+  }
+
+  function copyWeeklyDay(sourceDay: number) {
+    const source = weeklyStaffing.filter((item) => item.weekday === sourceDay);
+    setWeeklyStaffing(WEEKDAYS.flatMap((_, dayIndex) => source.map((item) => ({ ...item, weekday: dayIndex + 1, skills: { ...item.skills } }))));
+  }
+
   function handleApplyPresets(presetType: "3shifts" | "12h") {
-    syncListToJson(presetType === "3shifts" ? DEFAULT_3_SHIFTS : DEFAULT_12H_SHIFTS);
+    const preset = presetType === "3shifts" ? DEFAULT_3_SHIFTS : DEFAULT_12H_SHIFTS;
+    syncListToJson(preset);
+    if (scheduleMode === "weekly") {
+      setWeeklyStaffing(WEEKDAYS.flatMap((_, index) => preset.map((item) => ({
+        weekday: index + 1, start: item.start, end: item.end, rn: item.rn, pn: item.pn, leaders: item.leaders, skills: { ...item.skills },
+      }))));
+    }
   }
 
   function handleSwitchMode(mode: "visual" | "json") {
@@ -371,6 +397,15 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
         setError("ตรวจช่วงเวลาและจำนวนคน: เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม และจำนวนคนต้องเป็นจำนวนเต็มตั้งแต่ 0");
         return;
       }
+      if (scheduleMode === "weekly" && (weeklyStaffing.length === 0 || !weeklyStaffing.every((item) =>
+        Number.isInteger(item.weekday) && item.weekday >= 1 && item.weekday <= 7 &&
+        Number.isInteger(item.start) && Number.isInteger(item.end) && item.end > item.start &&
+        Number.isInteger(item.rn) && item.rn >= 0 && Number.isInteger(item.pn) && item.pn >= 0 &&
+        Number.isInteger(item.leaders) && item.leaders >= 0
+      ))) {
+        setError("อัตรากำลังรายสัปดาห์ไม่ครบหรือมีค่าที่ไม่ถูกต้อง");
+        return;
+      }
       const payload = {
         ...currentPolicy,
         status: "confirmed",
@@ -398,6 +433,8 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
         targets,
         preferences: currentPolicy.preferences || [],
         staffing: parsedStaffing,
+        staffingMode: scheduleMode,
+        weeklyStaffing,
       };
 
       await request(`/wards/${encodeURIComponent(roster.wardId)}/roster-policy`, token, "PUT", payload);
@@ -583,13 +620,50 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
           </div>
         </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button type="button" onClick={() => setScheduleMode("legacy")} className={"rounded-2xl border p-4 text-left " + (scheduleMode === "legacy" ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white")}>
+            <span className="block font-bold text-slate-900">รูปแบบเดิม</span><span className="text-sm text-slate-600">ใช้จำนวนเดียวกันทุกวัน และข้อยกเว้นเฉพาะวันที่</span>
+          </button>
+          <button type="button" onClick={() => setScheduleMode("weekly")} className={"rounded-2xl border p-4 text-left " + (scheduleMode === "weekly" ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white")}>
+            <span className="block font-bold text-slate-900">กำหนดตามวันในสัปดาห์</span><span className="text-sm text-slate-600">กำหนดจันทร์–อาทิตย์ และบังคับจำนวนให้พอดี</span>
+          </button>
+        </div>
+
         <div id="policy-staffing-help" className="rounded-2xl bg-blue-50 p-4 text-sm leading-relaxed text-blue-950 space-y-2">
           <p><strong>ข้อบังคับ • จำนวนขั้นต่ำตลอดช่วงเวลา</strong> เลือกช่วงที่ต้องมีคนปฏิบัติงานจริง การเพิ่มจำนวนทำให้ต้องใช้บุคลากรมากขึ้น และอาจเหลือเวรที่จัดไม่ได้</p>
           <p><strong>RN ไม่นับรวมหัวหน้าในช่องนี้:</strong> RN 2 + หัวหน้า 1 = ต้องมี RN รวม 3 คน และมีผู้เป็นหัวหน้าอย่างน้อย 1 คน หากเพิ่ม PN 1 จะต้องใช้รวม 4 คน</p>
           <p><strong>เวลาเริ่ม / สิ้นสุด:</strong> เช่น 20.00–08.00 ให้เลือก 08.00 วันถัดไป ส่วน 16.00–เที่ยงคืนให้เลือก 24.00 ปุ่มตัวอย่างผลัดจะแทนรายการทั้งหมดด้านล่าง</p>
           <p>RN = พยาบาลวิชาชีพ • PN = ผู้ช่วยพยาบาล • หัวหน้า = ผู้มีคุณสมบัติหัวหน้าเวร • ใส่ 0 หากไม่ต้องการตำแหน่งนั้น</p>
         </div>
-        {staffingMode === "visual" ? (
+        {scheduleMode === "weekly" ? (
+          <div className="space-y-4">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100 text-slate-700"><tr><th className="p-3 text-left">วัน</th><th className="p-3 text-left">ผลัด</th><th className="p-3">RN ไม่รวมหัวหน้า</th><th className="p-3">PN</th><th className="p-3">หัวหน้าเวร</th><th className="p-3">รวม</th></tr></thead>
+                <tbody>
+                  {weeklyStaffing.map((item, index) => (
+                    <tr key={[item.weekday, item.start, item.end].join("-")} className="border-t border-slate-200">
+                      <td className="p-3 font-bold">{WEEKDAYS[item.weekday - 1]}</td>
+                      <td className="p-3 whitespace-nowrap">{minsToTimeString(item.start)}–{minsToTimeString(item.end)}</td>
+                      {(["rn", "pn", "leaders"] as const).map((field) => (
+                        <td key={field} className="p-2 text-center">
+                          <input type="number" min="0" max="30" value={item[field]} aria-label={[WEEKDAYS[item.weekday - 1], field, minsToTimeString(item.start)].join(" ")}
+                            onChange={(event) => handleUpdateWeekly(index, field, Number(event.target.value))}
+                            className="w-20 rounded-lg border border-slate-300 p-2 text-center font-bold" />
+                        </td>
+                      ))}
+                      <td className="p-3 text-center font-black text-blue-800">{item.rn + item.pn + item.leaders}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {WEEKDAYS.map((day, index) => <button key={day} type="button" onClick={() => copyWeeklyDay(index + 1)} className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-800">คัดลอกวัน{day}ไปทุกวัน</button>)}
+            </div>
+            <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">จำนวนในรูปแบบนี้ต้องได้พอดี หากมีเวรล็อกหรือข้อจำกัดทำให้ขาดหรือเกิน ระบบจะแสดงข้อผิดพลาดก่อนอนุมัติ</p>
+          </div>
+        ) : staffingMode === "visual" ? (
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
               {staffingList.map((item, index) => {

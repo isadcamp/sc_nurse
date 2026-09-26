@@ -267,7 +267,6 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		return false
 	}
 
-
 	consecutiveDays := map[string]int{}
 	consecutiveNights := map[string]int{}
 	consecutiveDoubles := map[string]int{}
@@ -332,38 +331,65 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		pnCount = 1
 	}
 
-	dailyRNMorn, dailyRNEve, dailyRNNight := 0, 0, 0
-	dailyPNMorn, dailyPNEve, dailyPNNight := 0, 0, 0
-	for _, st := range r.Policy.Staffing {
-		if st.Start >= 480 && st.End <= 960 {
-			dailyRNMorn += st.RN + st.Leaders
-			dailyPNMorn += st.PN
-		} else if st.Start >= 960 && st.End <= 1440 {
-			dailyRNEve += st.RN + st.Leaders
-			dailyPNEve += st.PN
-		} else if st.Start == 0 && st.End <= 480 {
-			dailyRNNight += st.RN + st.Leaders
-			dailyPNNight += st.PN
+	monthlyRNMorn, monthlyRNEve, monthlyRNNight := 0, 0, 0
+	monthlyPNMorn, monthlyPNEve, monthlyPNNight := 0, 0, 0
+	hasStaffing := false
+	for td := a; td.Before(b); td = td.AddDate(0, 0, 1) {
+		for _, st := range staffingForDate(r, td.Format("2006-01-02")) {
+			hasStaffing = true
+			if st.Start >= 480 && st.End <= 960 {
+				monthlyRNMorn += st.RN + st.Leaders
+				monthlyPNMorn += st.PN
+			} else if st.Start >= 960 && st.End <= 1440 {
+				monthlyRNEve += st.RN + st.Leaders
+				monthlyPNEve += st.PN
+			} else if st.Start == 0 && st.End <= 480 {
+				monthlyRNNight += st.RN + st.Leaders
+				monthlyPNNight += st.PN
+			}
 		}
 	}
-	if dailyRNMorn == 0 && dailyPNMorn == 0 {
-		dailyRNMorn = 1
-		dailyPNMorn = 1
-	}
-	if dailyRNEve == 0 && dailyPNEve == 0 {
-		dailyRNEve = 2
-	}
-	if dailyRNNight == 0 && dailyPNNight == 0 {
-		dailyRNNight = 1
+	if !hasStaffing {
+		monthlyRNMorn, monthlyPNMorn = numDays, numDays
+		monthlyRNEve = numDays * 2
+		monthlyRNNight = numDays
 	}
 
-	rnTargetMorns := float64(numDays*dailyRNMorn) / float64(rnCount)
-	rnTargetEves := float64(numDays*dailyRNEve) / float64(rnCount)
-	rnTargetNights := float64(numDays*dailyRNNight) / float64(rnCount)
+	rnTargetMorns := float64(monthlyRNMorn) / float64(rnCount)
+	rnTargetEves := float64(monthlyRNEve) / float64(rnCount)
+	rnTargetNights := float64(monthlyRNNight) / float64(rnCount)
 
-	pnTargetMorns := float64(numDays*dailyPNMorn) / float64(pnCount)
-	pnTargetEves := float64(numDays*dailyPNEve) / float64(pnCount)
-	pnTargetNights := float64(numDays*dailyPNNight) / float64(pnCount)
+	pnTargetMorns := float64(monthlyPNMorn) / float64(pnCount)
+	pnTargetEves := float64(monthlyPNEve) / float64(pnCount)
+	pnTargetNights := float64(monthlyPNNight) / float64(pnCount)
+
+	cumulativeDemandRatio := make([]float64, numDays)
+	if r.Policy.StaffingMode == "weekly" {
+		totalMonthDemandHours := 0.0
+		dailyDemandHours := make([]float64, numDays)
+
+		dayIdx := 0
+		for td := a; td.Before(b); td = td.AddDate(0, 0, 1) {
+			ds := td.Format("2006-01-02")
+			for _, st := range staffingForDate(r, ds) {
+				needRN := st.RN + st.Leaders
+				durHours := float64(st.End-st.Start) / 60.0
+				dailyDemandHours[dayIdx] += float64(needRN+st.PN) * durHours
+			}
+			totalMonthDemandHours += dailyDemandHours[dayIdx]
+			dayIdx++
+		}
+
+		accumDemand := 0.0
+		for i := 0; i < numDays; i++ {
+			accumDemand += dailyDemandHours[i]
+			if totalMonthDemandHours > 0 {
+				cumulativeDemandRatio[i] = accumDemand / totalMonthDemandHours
+			} else {
+				cumulativeDemandRatio[i] = float64(i+1) / float64(numDays)
+			}
+		}
+	}
 
 	// Helper to calculate exact rest hours between two shifts across midnight
 	isValidRest := func(prevCode, nextCode string) bool {
@@ -511,13 +537,21 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		// Sort requirements so shifts with strictest constraints are fulfilled first (Night top priority, Leaders, Skills)
 		sort.SliceStable(activeStaffing, func(i, j int) bool {
 			scoreI := 0
-			if activeStaffing[i].Start == 0 { scoreI += 50 }
-			if activeStaffing[i].Leaders > 0 { scoreI += 20 }
+			if activeStaffing[i].Start == 0 {
+				scoreI += 50
+			}
+			if activeStaffing[i].Leaders > 0 {
+				scoreI += 20
+			}
 			scoreI += len(activeStaffing[i].Skills) * 5
 
 			scoreJ := 0
-			if activeStaffing[j].Start == 0 { scoreJ += 50 }
-			if activeStaffing[j].Leaders > 0 { scoreJ += 20 }
+			if activeStaffing[j].Start == 0 {
+				scoreJ += 50
+			}
+			if activeStaffing[j].Leaders > 0 {
+				scoreJ += 20
+			}
 			scoreJ += len(activeStaffing[j].Skills) * 5
 
 			if scoreI != scoreJ {
@@ -631,25 +665,35 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 					if aCode == "Day" || aCode == "D" || aCode == "12D" {
 						if n.Position == "RN" {
 							dayRNs++
-							if n.Leader { dayLead++ }
+							if n.Leader {
+								dayLead++
+							}
 						} else if n.Position == "PN" {
 							dayPNs++
 						}
 					} else if aCode == "Night" || aCode == "N" || aCode == "12N" {
 						if n.Position == "RN" {
 							nightRNs++
-							if n.Leader { nightLead++ }
+							if n.Leader {
+								nightLead++
+							}
 						} else if n.Position == "PN" {
 							nightPNs++
 						}
 					}
 				}
 				pairedRN := dayRNs
-				if nightRNs < pairedRN { pairedRN = nightRNs }
+				if nightRNs < pairedRN {
+					pairedRN = nightRNs
+				}
 				pairedPN := dayPNs
-				if nightPNs < pairedPN { pairedPN = nightPNs }
+				if nightPNs < pairedPN {
+					pairedPN = nightPNs
+				}
 				pairedLead := dayLead
-				if nightLead < pairedLead { pairedLead = nightLead }
+				if nightLead < pairedLead {
+					pairedLead = nightLead
+				}
 
 				for pairedLead > 0 && neededLeaders > 0 {
 					neededLeaders--
@@ -928,11 +972,23 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 						}
 						eveRemainingDeficit := eveReqNeeded - eveAlreadyCovered
 
-						// Calculate target double shifts needed per day for this role to balance capacity and guarantee MinOff
-						dailyRoleMorn, dailyRoleEve, dailyRoleNight := dailyRNMorn, dailyRNEve, dailyRNNight
+						// Calculate target double shifts from this date's resolved staffing.
+						dailyRoleMorn, dailyRoleEve, dailyRoleNight := 0, 0, 0
+						for _, ar := range activeStaffing {
+							need := ar.RN + ar.Leaders
+							if targetRole == "PN" {
+								need = ar.PN
+							}
+							if ar.Start >= 480 && ar.End <= 960 {
+								dailyRoleMorn += need
+							} else if ar.Start >= 960 && ar.End <= 1440 {
+								dailyRoleEve += need
+							} else if ar.Start == 0 && ar.End <= 480 {
+								dailyRoleNight += need
+							}
+						}
 						roleStaffCount := rnCount
 						if targetRole == "PN" {
-							dailyRoleMorn, dailyRoleEve, dailyRoleNight = dailyPNMorn, dailyPNEve, dailyPNNight
 							roleStaffCount = pnCount
 						}
 						targetDoublesToday := 0
@@ -1006,6 +1062,9 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 						// Uniform Monthly Pacing: Prevent accumulating hours too fast in early weeks (avoid burnout and end-of-month idle clusters)
 						if numDays > 0 {
 							expectedPacingHours := float64(dayIndex+1) * (tTarget / float64(numDays))
+							if r.Policy.StaffingMode == "weekly" && len(cumulativeDemandRatio) > dayIndex {
+								expectedPacingHours = tTarget * cumulativeDemandRatio[dayIndex]
+							}
 							if effectiveCredit > expectedPacingHours+16.0 {
 								score -= (effectiveCredit - expectedPacingHours) * 20.0
 							}
@@ -1068,7 +1127,43 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 
 						// Leveling: standard vs 12h/16h shift incentives
 						if optShift.Double || optCode == "ชบ" {
-							targetDoublesPerNurse := float64(numDays*targetDoublesToday) / float64(roleStaffCount)
+							targetDoublesPerNurse := 0.0
+							if r.Policy.StaffingMode == "weekly" {
+								weeklyTotalDoublesNeeded := 0
+								for wDay := 1; wDay <= 7; wDay++ {
+									wMorn, wEve, wNight := 0, 0, 0
+									for _, ws := range r.Policy.WeeklyStaffing {
+										if ws.Weekday == wDay {
+											need := ws.RN + ws.Leaders
+											if targetRole == "PN" {
+												need = ws.PN
+											}
+											if ws.Start >= 480 && ws.End <= 960 {
+												wMorn += need
+											} else if ws.Start >= 960 && ws.End <= 1440 {
+												wEve += need
+											} else if ws.Start == 0 && ws.End <= 480 {
+												wNight += need
+											}
+										}
+									}
+									wAvailDay := roleStaffCount - (2 * wNight)
+									if wAvailDay < (wMorn + wEve) {
+										neededD := (wMorn + wEve) - wAvailDay
+										if neededD > wMorn {
+											neededD = wMorn
+										}
+										if neededD > wEve {
+											neededD = wEve
+										}
+										weeklyTotalDoublesNeeded += neededD
+									}
+								}
+								monthlyTotalDoubles := float64(weeklyTotalDoublesNeeded) * (float64(numDays) / 7.0)
+								targetDoublesPerNurse = monthlyTotalDoubles / float64(roleStaffCount)
+							} else {
+								targetDoublesPerNurse = float64(numDays*targetDoublesToday) / float64(roleStaffCount)
+							}
 							if float64(doubleShiftsCount[n.ID]) >= targetDoublesPerNurse {
 								score -= (float64(doubleShiftsCount[n.ID]) - targetDoublesPerNurse + 1.0) * 150.0
 							} else {
@@ -1117,31 +1212,48 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 							targetNights = pnTargetNights
 						}
 
-						if optIsNight {
-							// Night block continuity: If nurse is already on Night (and within max nights),
-							// strongly encourage continuing the night block to avoid blocking multiple nurses across days.
-							if consecutiveNights[n.ID] > 0 && consecutiveNights[n.ID] < maxNights {
-								score += 550.0
+						if r.Policy.StaffingMode == "weekly" {
+							if optIsNight {
+								if consecutiveNights[n.ID] > 0 && consecutiveNights[n.ID] < maxNights {
+									score += 550.0
+								}
+								if float64(nightShiftsCount[n.ID]) < targetNights {
+									score += (targetNights - float64(nightShiftsCount[n.ID])) * 40.0
+								}
 							}
-							// Soft leveling penalty - filling required night shifts ALWAYS takes precedence
-							if float64(nightShiftsCount[n.ID]) >= targetNights {
-								score -= (float64(nightShiftsCount[n.ID]) - targetNights + 1.0) * 40.0
-							} else {
-								score += (targetNights - float64(nightShiftsCount[n.ID])) * 120.0
+							if optCode == "บ" && float64(eveShiftsCount[n.ID]) < targetEves {
+								score += (targetEves - float64(eveShiftsCount[n.ID])) * 20.0
 							}
-						}
-						if optCode == "บ" {
-							if float64(eveShiftsCount[n.ID]) >= targetEves {
-								score -= (float64(eveShiftsCount[n.ID]) - targetEves + 1.0) * 120.0
-							} else {
-								score += (targetEves - float64(eveShiftsCount[n.ID])) * 40.0
+							if (optCode == "ช" || optCode == "ชบ" || optCode == "Day" || optCode == "D" || optCode == "12D") && float64(morningShiftsCount[n.ID]) < targetMorns {
+								score += (targetMorns - float64(morningShiftsCount[n.ID])) * 20.0
 							}
-						}
-						if optCode == "ช" || optCode == "ชบ" || optCode == "Day" || optCode == "D" || optCode == "12D" {
-							if float64(morningShiftsCount[n.ID]) >= targetMorns {
-								score -= (float64(morningShiftsCount[n.ID]) - targetMorns + 1.0) * 80.0
-							} else {
-								score += (targetMorns - float64(morningShiftsCount[n.ID])) * 40.0
+						} else {
+							if optIsNight {
+								// Night block continuity: If nurse is already on Night (and within max nights),
+								// strongly encourage continuing the night block to avoid blocking multiple nurses across days.
+								if consecutiveNights[n.ID] > 0 && consecutiveNights[n.ID] < maxNights {
+									score += 550.0
+								}
+								// Soft leveling penalty - filling required night shifts ALWAYS takes precedence
+								if float64(nightShiftsCount[n.ID]) >= targetNights {
+									score -= (float64(nightShiftsCount[n.ID]) - targetNights + 1.0) * 40.0
+								} else {
+									score += (targetNights - float64(nightShiftsCount[n.ID])) * 120.0
+								}
+							}
+							if optCode == "บ" {
+								if float64(eveShiftsCount[n.ID]) >= targetEves {
+									score -= (float64(eveShiftsCount[n.ID]) - targetEves + 1.0) * 120.0
+								} else {
+									score += (targetEves - float64(eveShiftsCount[n.ID])) * 40.0
+								}
+							}
+							if optCode == "ช" || optCode == "ชบ" || optCode == "Day" || optCode == "D" || optCode == "12D" {
+								if float64(morningShiftsCount[n.ID]) >= targetMorns {
+									score -= (float64(morningShiftsCount[n.ID]) - targetMorns + 1.0) * 80.0
+								} else {
+									score += (targetMorns - float64(morningShiftsCount[n.ID])) * 40.0
+								}
 							}
 						}
 
@@ -1454,10 +1566,10 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		// Trim excess RN in Evening: downgrade unlocked "ชบ" -> "ช"
 		// As per hospital rule: If target is 4, allow 3.5 (do not exceed 4.0).
 		// Trim whenever currentEveRN > target (e.g. 4.5 -> 3.5 <= 4.0).
-		if currentEveRN > totalEveReqRNFloat + 0.001 {
+		if currentEveRN > totalEveReqRNFloat+0.001 {
 			// Pass 1: Non-leader RNs
 			for _, n := range staff {
-				if currentEveRN <= totalEveReqRNFloat + 0.001 {
+				if currentEveRN <= totalEveReqRNFloat+0.001 {
 					break
 				}
 				if !n.Active || n.Position != "RN" || n.Leader {
@@ -1476,7 +1588,7 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 
 			// Pass 2: Leader RNs (only if remaining evening leaders >= eveReqLeaders)
 			for _, n := range staff {
-				if currentEveRN <= totalEveReqRNFloat + 0.001 {
+				if currentEveRN <= totalEveReqRNFloat+0.001 {
 					break
 				}
 				if !n.Active || n.Position != "RN" || !n.Leader {
@@ -1489,7 +1601,7 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 				if fCell, ok := fixedMap[cellKey(c)]; ok && fCell.Locked {
 					continue
 				}
-				if currentEveLeaders > eveReqLeadersFloat + 0.001 {
+				if currentEveLeaders > eveReqLeadersFloat+0.001 {
 					dayAssignments[n.ID] = "ช"
 					currentEveRN -= 1.0
 					currentEveLeaders -= 1.0
@@ -1498,9 +1610,9 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		}
 
 		// Trim excess PN in Evening: downgrade unlocked "ชบ" -> "ช"
-		if currentEvePN > eveReqPNFloat + 0.001 {
+		if currentEvePN > eveReqPNFloat+0.001 {
 			for _, n := range staff {
-				if currentEvePN <= eveReqPNFloat + 0.001 {
+				if currentEvePN <= eveReqPNFloat+0.001 {
 					break
 				}
 				if !n.Active || n.Position != "PN" {
@@ -1612,7 +1724,9 @@ func solveGreedy(ctx context.Context, in domain.SolverInput) (domain.SolverOutpu
 		}
 	}
 
-	scheduledCells = guaranteeMinWorkingDays(r, scheduledCells)
+	if r.Policy.StaffingMode != "weekly" {
+        scheduledCells = guaranteeMinWorkingDays(r, scheduledCells)
+    }
 	scheduledCells = pruneExcessDoubles(r, scheduledCells)
 
 	testRoster := r
@@ -1687,16 +1801,36 @@ func CalculatePlanMetrics(r domain.Roster, assignments []domain.Cell) domain.Pla
 		}
 		shiftHours[s.Code] = h
 	}
-	if _, ok := shiftHours["ช"]; !ok { shiftHours["ช"] = 8 }
-	if _, ok := shiftHours["บ"]; !ok { shiftHours["บ"] = 8 }
-	if _, ok := shiftHours["ด"]; !ok { shiftHours["ด"] = 8 }
-	if _, ok := shiftHours["ชบ"]; !ok { shiftHours["ชบ"] = 16 }
-	if _, ok := shiftHours["Day"]; !ok { shiftHours["Day"] = 12 }
-	if _, ok := shiftHours["Night"]; !ok { shiftHours["Night"] = 12 }
-	if _, ok := shiftHours["D"]; !ok { shiftHours["D"] = 12 }
-	if _, ok := shiftHours["N"]; !ok { shiftHours["N"] = 12 }
-	if _, ok := shiftHours["12D"]; !ok { shiftHours["12D"] = 12 }
-	if _, ok := shiftHours["12N"]; !ok { shiftHours["12N"] = 12 }
+	if _, ok := shiftHours["ช"]; !ok {
+		shiftHours["ช"] = 8
+	}
+	if _, ok := shiftHours["บ"]; !ok {
+		shiftHours["บ"] = 8
+	}
+	if _, ok := shiftHours["ด"]; !ok {
+		shiftHours["ด"] = 8
+	}
+	if _, ok := shiftHours["ชบ"]; !ok {
+		shiftHours["ชบ"] = 16
+	}
+	if _, ok := shiftHours["Day"]; !ok {
+		shiftHours["Day"] = 12
+	}
+	if _, ok := shiftHours["Night"]; !ok {
+		shiftHours["Night"] = 12
+	}
+	if _, ok := shiftHours["D"]; !ok {
+		shiftHours["D"] = 12
+	}
+	if _, ok := shiftHours["N"]; !ok {
+		shiftHours["N"] = 12
+	}
+	if _, ok := shiftHours["12D"]; !ok {
+		shiftHours["12D"] = 12
+	}
+	if _, ok := shiftHours["12N"]; !ok {
+		shiftHours["12N"] = 12
+	}
 
 	for _, c := range assignments {
 		cellMap[c.NurseID+"|"+c.Date] = c.ShiftCode
@@ -2915,5 +3049,3 @@ func pruneExcessDoubles(r domain.Roster, cells []domain.Cell) []domain.Cell {
 
 	return out
 }
-
-

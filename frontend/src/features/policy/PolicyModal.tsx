@@ -312,6 +312,8 @@ export function PolicyModal({ roster, token, isOpen, onClose, onSaved }: PolicyM
         targets,
         preferences: currentPolicy.preferences || [],
         staffing: parsedStaffing,
+        staffingMode: currentPolicy.staffingMode ?? "legacy",
+        weeklyStaffing: currentPolicy.weeklyStaffing ?? [],
       };
 
       await request(`/wards/${encodeURIComponent(roster.wardId)}/roster-policy`, token, "PUT", payload);

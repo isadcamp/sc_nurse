@@ -1,40 +1,43 @@
 package scheduler
 
 import (
- "fmt"
- "math"
- "sort"
- "nurse-scheduler/backend/internal/domain"
+	"fmt"
+	"math"
+	"nurse-scheduler/backend/internal/domain"
+	"sort"
 )
 
 // Resolve date overrides per interval, matching validation.Validate.
 func staffingForDate(r domain.Roster, date string) []domain.Staffing {
- result:=[]domain.Staffing{}
- for _,req:=range r.Policy.Staffing {
-  if req.Date!="" && req.Date!=date {continue}
-  overridden:=false
-  if req.Date=="" {for _,specific:=range r.Policy.Staffing {
-   if specific.Date==date && specific.Start==req.Start && specific.End==req.End {overridden=true;break}
-  }}
-  if !overridden {result=append(result,req)}
- }
- return result
+	return domain.StaffingForDate(r.Policy, date)
 }
 
-func usableShift(r domain.Roster,n domain.Staff,sh domain.RosterShift) bool {
- if sh.Code=="บด" || sh.Code=="X" || sh.Code=="L" {return false}
- allowed:=false
- for _,code:=range n.Allowed {if code==sh.Code {allowed=true}}
- if !allowed || (sh.Double && (!n.Double || r.Policy.MaxDoubleShifts==0)) {return false}
- periods:=append([]domain.Period(nil),sh.Periods...)
- sort.Slice(periods,func(i,j int)bool{return periods[i].Start<periods[j].Start})
- start,end:=-1,-1
- for _,p:=range periods {
-  if p.Start>end {start=p.Start}
-  end=p.End
-  if float64(end-start)/60>r.Policy.MaxContinuousHours {return false}
- }
- return len(periods)>0
+func usableShift(r domain.Roster, n domain.Staff, sh domain.RosterShift) bool {
+	if sh.Code == "บด" || sh.Code == "X" || sh.Code == "L" {
+		return false
+	}
+	allowed := false
+	for _, code := range n.Allowed {
+		if code == sh.Code {
+			allowed = true
+		}
+	}
+	if !allowed || (sh.Double && (!n.Double || r.Policy.MaxDoubleShifts == 0)) {
+		return false
+	}
+	periods := append([]domain.Period(nil), sh.Periods...)
+	sort.Slice(periods, func(i, j int) bool { return periods[i].Start < periods[j].Start })
+	start, end := -1, -1
+	for _, p := range periods {
+		if p.Start > end {
+			start = p.Start
+		}
+		end = p.End
+		if float64(end-start)/60 > r.Policy.MaxContinuousHours {
+			return false
+		}
+	}
+	return len(periods) > 0
 }
 
 // capacityWarnings performs a multi-dimensional workforce feasibility evaluation:

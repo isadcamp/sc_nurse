@@ -260,37 +260,37 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 		grandTotalPay += totalPay
 
 		stat := domain.NurseMonthStat{
-			NurseID:                 nurse.ID,
-			NurseName:               nurse.Name,
-			Position:                nurse.Position,
-			PlannedHours:            h.Monthly,
-			ActualWorkHours:         actualWorkHours,
-			LeaveCreditHours:        leaveCreditHours,
-			CreditHours:             creditHours,
-			TargetHours:             targetHours,
-			VarianceHours:           varianceHours,
-			ShortageHours:           shortageHours,
-			OTHours:                 otHours,
-			OffDays:                 offDays,
-			LeaveDays:               leaveDays,
-			WorkDays:                workDays,
-			DoubleShifts:            doubles,
-			NightHours:              h.Night,
-			NightShifts:             h.Nights,
-			CarryInHours:            h.CarryIn,
-			CarryOutHours:           h.CarryOut,
-			ShiftCounts:             shiftCounts,
+			NurseID:                  nurse.ID,
+			NurseName:                nurse.Name,
+			Position:                 nurse.Position,
+			PlannedHours:             h.Monthly,
+			ActualWorkHours:          actualWorkHours,
+			LeaveCreditHours:         leaveCreditHours,
+			CreditHours:              creditHours,
+			TargetHours:              targetHours,
+			VarianceHours:            varianceHours,
+			ShortageHours:            shortageHours,
+			OTHours:                  otHours,
+			OffDays:                  offDays,
+			LeaveDays:                leaveDays,
+			WorkDays:                 workDays,
+			DoubleShifts:             doubles,
+			NightHours:               h.Night,
+			NightShifts:              h.Nights,
+			CarryInHours:             h.CarryIn,
+			CarryOutHours:            h.CarryOut,
+			ShiftCounts:              shiftCounts,
 			CalculatedEveNightShifts: calculatedEveNightShifts,
-			AllowanceCap:            allowanceCap,
-			PayableEveNightShifts:   payableEveNightShifts,
-			ExcessEveNightShifts:    excessEveNightShifts,
-			EveNightShifts:          payableEveNightShifts,
-			OTShifts:                otShifts,
-			EveNightPay:             eveNightPay,
-			OTPay:                   otPay,
-			TotalPay:                totalPay,
-			HasOverride:             hasOverride,
-			Overrides:               nurseOverrides,
+			AllowanceCap:             allowanceCap,
+			PayableEveNightShifts:    payableEveNightShifts,
+			ExcessEveNightShifts:     excessEveNightShifts,
+			EveNightShifts:           payableEveNightShifts,
+			OTShifts:                 otShifts,
+			EveNightPay:              eveNightPay,
+			OTPay:                    otPay,
+			TotalPay:                 totalPay,
+			HasOverride:              hasOverride,
+			Overrides:                nurseOverrides,
 		}
 
 		totalPlannedHours += actualWorkHours
@@ -418,7 +418,7 @@ func ComputeSummaryWithOverrides(r domain.Roster, overrides []domain.PayrollOver
 			}
 
 			// Required from policy staffing
-			reqRN, reqPN, reqLeaders := findPolicyRequirement(r.Policy.Staffing, dateStr, si.startMin, si.endMin)
+			reqRN, reqPN, reqLeaders := findPolicyRequirement(domain.StaffingForDate(r.Policy, dateStr), dateStr, si.startMin, si.endMin)
 			actualTotal := actualRN + actualPN
 			reqTotal := reqRN + reqPN + reqLeaders
 
@@ -548,4 +548,3 @@ func getHourlyOTRate(rate float64, defaultHourly float64) float64 {
 	}
 	return rate
 }
-

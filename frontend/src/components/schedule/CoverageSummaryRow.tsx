@@ -151,21 +151,25 @@ export function computeRosterDailyCoverage(roster: Roster | undefined, dates: st
       let targetPN = 0;
       let targetTotal = 0;
 
-      // 1. Specific date match
-      let matched = false;
-      for (const req of policyStaffing) {
-        if (req.date === date && ((req.start <= p.start && req.end >= p.end) || (req.start === p.start && req.end === p.end))) {
-          targetRN = (req.rn || 0) + (req.leaders || 0);
-          targetPN = req.pn || 0;
-          targetTotal = targetRN + targetPN;
-          matched = true;
-          break;
+      if (roster.policy?.staffingMode === "weekly" && roster.policy.weeklyStaffing?.length) {
+        // Weekly Staffing Mode: lookup requirement by day of week (1=Monday ... 7=Sunday)
+        const d = new Date(date + "T00:00:00");
+        let weekday = d.getDay(); // 0 = Sunday, 1 = Monday ... 6 = Saturday
+        if (weekday === 0) weekday = 7; // 1 = Monday ... 7 = Sunday
+
+        for (const req of roster.policy.weeklyStaffing) {
+          if (req.weekday === weekday && ((req.start <= p.start && req.end >= p.end) || (req.start === p.start && req.end === p.end))) {
+            targetRN = (req.rn || 0) + (req.leaders || 0);
+            targetPN = req.pn || 0;
+            targetTotal = targetRN + targetPN;
+            break;
+          }
         }
-      }
-      // 2. Default match
-      if (!matched) {
+      } else {
+        // 1. Specific date match
+        let matched = false;
         for (const req of policyStaffing) {
-          if ((!req.date || req.date === "") && ((req.start <= p.start && req.end >= p.end) || (req.start === p.start && req.end === p.end))) {
+          if (req.date === date && ((req.start <= p.start && req.end >= p.end) || (req.start === p.start && req.end === p.end))) {
             targetRN = (req.rn || 0) + (req.leaders || 0);
             targetPN = req.pn || 0;
             targetTotal = targetRN + targetPN;
@@ -173,25 +177,37 @@ export function computeRosterDailyCoverage(roster: Roster | undefined, dates: st
             break;
           }
         }
-      }
-      // 3. 12-hour night policy requirement match (20:00-08:00 => 1200-1920)
-      if (!matched && p.key === "night") {
-        for (const req of policyStaffing) {
-          if (req.date === date && req.start >= 1200 && req.end >= 1920) {
-            targetRN = (req.rn || 0) + (req.leaders || 0);
-            targetPN = req.pn || 0;
-            targetTotal = targetRN + targetPN;
-            matched = true;
-            break;
-          }
-        }
+        // 2. Default match
         if (!matched) {
           for (const req of policyStaffing) {
-            if ((!req.date || req.date === "") && req.start >= 1200 && req.end >= 1920) {
+            if ((!req.date || req.date === "") && ((req.start <= p.start && req.end >= p.end) || (req.start === p.start && req.end === p.end))) {
               targetRN = (req.rn || 0) + (req.leaders || 0);
               targetPN = req.pn || 0;
               targetTotal = targetRN + targetPN;
+              matched = true;
               break;
+            }
+          }
+        }
+        // 3. 12-hour night policy requirement match (20:00-08:00 => 1200-1920)
+        if (!matched && p.key === "night") {
+          for (const req of policyStaffing) {
+            if (req.date === date && req.start >= 1200 && req.end >= 1920) {
+              targetRN = (req.rn || 0) + (req.leaders || 0);
+              targetPN = req.pn || 0;
+              targetTotal = targetRN + targetPN;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            for (const req of policyStaffing) {
+              if ((!req.date || req.date === "") && req.start >= 1200 && req.end >= 1920) {
+                targetRN = (req.rn || 0) + (req.leaders || 0);
+                targetPN = req.pn || 0;
+                targetTotal = targetRN + targetPN;
+                break;
+              }
             }
           }
         }

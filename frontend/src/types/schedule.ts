@@ -74,6 +74,10 @@ export interface StaffingRequirement {
   skills?: Record<string, number>;
 }
 
+export interface WeeklyStaffingRequirement extends Omit<StaffingRequirement, "date"> {
+  weekday: number;
+}
+
 export interface Policy {
   status?: string;
   version?: string;
@@ -97,6 +101,8 @@ export interface Policy {
   targets?: unknown[];
   preferences?: unknown[];
   staffing?: StaffingRequirement[];
+  staffingMode?: "legacy" | "weekly";
+  weeklyStaffing?: WeeklyStaffingRequirement[];
 }
 export interface Roster {
   id: number;

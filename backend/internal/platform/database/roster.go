@@ -20,6 +20,8 @@ type queryer interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
 }
 
+const defaultPolicyJSON = `{"status":"confirmed","version":"v1.0","effectiveFrom":"2020-01-01","effectiveTo":"2099-12-31","minRestHours":8,"maxConsecutiveDays":6,"maxConsecutiveNights":3,"maxMonthlyHours":240,"maxContinuousHours":16,"maxDoubleShifts":8,"nightStart":1320,"nightEnd":1800,"fairnessHours":48,"weights":{"coverage":100,"fairness":50,"preference":20,"stability":10},"targets":[],"preferences":[],"staffing":[{"date":"","start":480,"end":960,"rn":1,"pn":1,"leaders":1,"skills":{}},{"date":"","start":960,"end":1440,"rn":1,"pn":1,"leaders":1,"skills":{}},{"date":"","start":0,"end":480,"rn":1,"pn":0,"leaders":1,"skills":{}}]}`
+
 func dbError(err error) error {
 	if errors.Is(err, sql.ErrNoRows) {
 		return repository.ErrNotFound
@@ -96,7 +98,7 @@ func (s *RosterStore) Create(ctx context.Context, w string, m, y int, a domain.A
 		return domain.Roster{}, e
 	}
 	_ = pruneOldDrafts(ctx, tx, w, m, y, 12)
-	res, e := tx.ExecContext(ctx, "INSERT INTO schedules(ward_id,month,year,status) VALUES(?,?,?,'draft')", w, m, y)
+	res, e := tx.ExecContext(ctx, "INSERT INTO schedules(ward_id,month,year,status,policy_snapshot) VALUES(?,?,?,'draft',(SELECT policy FROM roster_policies WHERE ward_id=?))", w, m, y, w)
 	if e != nil {
 		return domain.Roster{}, dbError(e)
 	}
@@ -271,6 +273,16 @@ func (s *RosterStore) SetPolicy(ctx context.Context, w string, p domain.Policy, 
 		return e
 	}
 	a.Before = old
+	oldPolicy := []byte(old)
+	if len(oldPolicy) == 0 {
+		oldPolicy = []byte(defaultPolicyJSON)
+	}
+	if _, e = tx.ExecContext(ctx, "UPDATE schedules SET policy_snapshot=? WHERE ward_id=? AND policy_snapshot IS NULL", oldPolicy, w); e != nil {
+		return e
+	}
+	if _, e = tx.ExecContext(ctx, "UPDATE schedules SET policy_snapshot=? WHERE ward_id=? AND status IN ('draft','generated')", b, w); e != nil {
+		return e
+	}
 	_, e = tx.ExecContext(ctx, "INSERT INTO roster_policies(ward_id,policy) VALUES(?,?) ON DUPLICATE KEY UPDATE policy=VALUES(policy)", w, b)
 	if e != nil {
 		return e
@@ -285,10 +297,11 @@ func loadRoster(ctx context.Context, q queryer, id int64) (domain.Roster, error)
 	var submittedAt, approvedAt, publishedAt, closedAt sql.NullTime
 	var submittedBy, approvedBy, publishedBy, closedBy sql.NullString
 	var parentID sql.NullInt64
-	e := q.QueryRowContext(ctx, "SELECT s.id,s.ward_id,s.month,s.year,s.status,s.version,s.parent_id,s.submitted_by,s.submitted_at,s.approved_by,s.approved_at,s.published_by,s.published_at,s.closed_by,s.closed_at,w.timezone FROM schedules s JOIN wards w ON w.id=s.ward_id WHERE s.id=?", id).Scan(
+	var policySnapshot []byte
+	e := q.QueryRowContext(ctx, "SELECT s.id,s.ward_id,s.month,s.year,s.status,s.version,s.parent_id,s.submitted_by,s.submitted_at,s.approved_by,s.approved_at,s.published_by,s.published_at,s.closed_by,s.closed_at,w.timezone,s.policy_snapshot FROM schedules s JOIN wards w ON w.id=s.ward_id WHERE s.id=?", id).Scan(
 		&r.ID, &r.WardID, &r.Month, &r.Year, &r.Status, &r.Version, &parentID,
 		&submittedBy, &submittedAt, &approvedBy, &approvedAt, &publishedBy, &publishedAt, &closedBy, &closedAt,
-		&r.Timezone)
+		&r.Timezone, &policySnapshot)
 	if e != nil {
 		return r, dbError(e)
 	}
@@ -319,13 +332,16 @@ func loadRoster(ctx context.Context, q queryer, id int64) (domain.Roster, error)
 	if closedAt.Valid {
 		r.ClosedAt = closedAt.Time.UTC().Format(time.RFC3339)
 	}
-	const defaultPolicyJSON = `{"status":"confirmed","version":"v1.0","effectiveFrom":"2020-01-01","effectiveTo":"2099-12-31","minRestHours":8,"maxConsecutiveDays":6,"maxConsecutiveNights":3,"maxMonthlyHours":240,"maxContinuousHours":16,"maxDoubleShifts":8,"nightStart":1320,"nightEnd":1800,"fairnessHours":48,"weights":{"coverage":100,"fairness":50,"preference":20,"stability":10},"targets":[],"preferences":[],"staffing":[{"date":"","start":480,"end":960,"rn":1,"pn":1,"leaders":1,"skills":{}},{"date":"","start":960,"end":1440,"rn":1,"pn":1,"leaders":1,"skills":{}},{"date":"","start":0,"end":480,"rn":1,"pn":0,"leaders":1,"skills":{}}]}`
 	var policy []byte
-	e = q.QueryRowContext(ctx, "SELECT policy FROM roster_policies WHERE ward_id=?", r.WardID).Scan(&policy)
-	if errors.Is(e, sql.ErrNoRows) {
-		policy = []byte(defaultPolicyJSON)
-	} else if e != nil {
-		return r, e
+	if len(policySnapshot) > 0 {
+		policy = policySnapshot
+	} else {
+		e = q.QueryRowContext(ctx, "SELECT policy FROM roster_policies WHERE ward_id=?", r.WardID).Scan(&policy)
+		if errors.Is(e, sql.ErrNoRows) {
+			policy = []byte(defaultPolicyJSON)
+		} else if e != nil {
+			return r, e
+		}
 	}
 	savedCompensation := r.Policy.Compensation
 	if e = json.Unmarshal(policy, &r.Policy); e != nil {
@@ -635,7 +651,7 @@ func (s *RosterStore) CreateVersion(ctx context.Context, parentID int64, a domai
 		return domain.Roster{}, e
 	}
 	_ = pruneOldDrafts(ctx, tx, wardID, month, year, 12)
-	res, e := tx.ExecContext(ctx, "INSERT INTO schedules(ward_id,month,year,status,version,parent_id) VALUES(?,?,?,'draft',?,?)", wardID, month, year, version+1, parentID)
+	res, e := tx.ExecContext(ctx, "INSERT INTO schedules(ward_id,month,year,status,version,parent_id,policy_snapshot) SELECT ward_id,month,year,'draft',?,id,policy_snapshot FROM schedules WHERE id=?", version+1, parentID)
 	if e != nil {
 		return domain.Roster{}, dbError(e)
 	}

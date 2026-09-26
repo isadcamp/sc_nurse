@@ -55,6 +55,16 @@ type Staffing struct {
 	Leaders int            `json:"leaders"`
 	Skills  map[string]int `json:"skills"`
 }
+type WeeklyStaffing struct {
+	Weekday int            `json:"weekday"`
+	Start   int            `json:"start"`
+	End     int            `json:"end"`
+	RN      int            `json:"rn"`
+	PN      int            `json:"pn"`
+	Leaders int            `json:"leaders"`
+	Skills  map[string]int `json:"skills"`
+}
+
 type CompensationConfig struct {
 	WorkingDays    int     `json:"workingDays"`
 	AllowanceCap   float64 `json:"allowanceCap"`
@@ -65,31 +75,76 @@ type CompensationConfig struct {
 }
 
 type Policy struct {
-	Status string `json:"status,omitempty"`
-	Version string `json:"version,omitempty"`
-	EffectiveFrom string `json:"effectiveFrom,omitempty"`
-	EffectiveTo string `json:"effectiveTo,omitempty"`
-	MinOff int `json:"minOff,omitempty"`
-	MaxRolling24Hours float64 `json:"maxRolling24Hours,omitempty"`
-	MaxRolling7DaysHours float64 `json:"maxRolling7DaysHours,omitempty"`
-	Weights ObjectiveWeights `json:"weights"`
-	MinRestHours         float64            `json:"minRestHours"`
-	MaxConsecutiveDays   int                `json:"maxConsecutiveDays"`
-	MaxConsecutiveNights int                `json:"maxConsecutiveNights"`
-	MaxConsecutiveOffDays int               `json:"maxConsecutiveOffDays,omitempty"`
-	CompressOffOnShortage bool              `json:"compressOffOnShortage,omitempty"`
-	AllowOTOnShortage     bool              `json:"allowOTOnShortage,omitempty"`
-	MaxMonthlyHours      float64            `json:"maxMonthlyHours"`
-	MaxContinuousHours   float64            `json:"maxContinuousHours"`
-	MaxDoubleShifts      int                `json:"maxDoubleShifts"`
-	NightStart           int                `json:"nightStart"`
-	NightEnd             int                `json:"nightEnd"`
-	FairnessHours        float64            `json:"fairnessHours"`
-	Compensation         CompensationConfig `json:"compensation,omitempty"`
-	Targets              []Target           `json:"targets"`
-	Preferences          []Preference       `json:"preferences"`
-	Staffing             []Staffing         `json:"staffing"`
+	Status                string             `json:"status,omitempty"`
+	Version               string             `json:"version,omitempty"`
+	EffectiveFrom         string             `json:"effectiveFrom,omitempty"`
+	EffectiveTo           string             `json:"effectiveTo,omitempty"`
+	MinOff                int                `json:"minOff,omitempty"`
+	MaxRolling24Hours     float64            `json:"maxRolling24Hours,omitempty"`
+	MaxRolling7DaysHours  float64            `json:"maxRolling7DaysHours,omitempty"`
+	Weights               ObjectiveWeights   `json:"weights"`
+	MinRestHours          float64            `json:"minRestHours"`
+	MaxConsecutiveDays    int                `json:"maxConsecutiveDays"`
+	MaxConsecutiveNights  int                `json:"maxConsecutiveNights"`
+	MaxConsecutiveOffDays int                `json:"maxConsecutiveOffDays,omitempty"`
+	CompressOffOnShortage bool               `json:"compressOffOnShortage,omitempty"`
+	AllowOTOnShortage     bool               `json:"allowOTOnShortage,omitempty"`
+	MaxMonthlyHours       float64            `json:"maxMonthlyHours"`
+	MaxContinuousHours    float64            `json:"maxContinuousHours"`
+	MaxDoubleShifts       int                `json:"maxDoubleShifts"`
+	NightStart            int                `json:"nightStart"`
+	NightEnd              int                `json:"nightEnd"`
+	FairnessHours         float64            `json:"fairnessHours"`
+	Compensation          CompensationConfig `json:"compensation,omitempty"`
+	Targets               []Target           `json:"targets"`
+	Preferences           []Preference       `json:"preferences"`
+	Staffing              []Staffing         `json:"staffing"`
+	StaffingMode          string             `json:"staffingMode,omitempty"`
+	WeeklyStaffing        []WeeklyStaffing   `json:"weeklyStaffing,omitempty"`
 }
+
+func StaffingForDate(p Policy, date string) []Staffing {
+	d, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil
+	}
+	base := make([]Staffing, 0)
+	if p.StaffingMode == "weekly" {
+		weekday := int(d.Weekday())
+		if weekday == 0 {
+			weekday = 7
+		}
+		for _, x := range p.WeeklyStaffing {
+			if x.Weekday == weekday {
+				base = append(base, Staffing{Start: x.Start, End: x.End, RN: x.RN, PN: x.PN, Leaders: x.Leaders, Skills: x.Skills})
+			}
+		}
+	} else {
+		for _, x := range p.Staffing {
+			if x.Date == "" {
+				base = append(base, x)
+			}
+		}
+	}
+	for _, x := range p.Staffing {
+		if x.Date != date {
+			continue
+		}
+		found := false
+		for i := range base {
+			if base[i].Start == x.Start && base[i].End == x.End {
+				base[i] = x
+				found = true
+				break
+			}
+		}
+		if !found {
+			base = append(base, x)
+		}
+	}
+	return base
+}
+
 type Leave struct {
 	NurseID  string `json:"nurseId"`
 	Start    string `json:"start"`
@@ -176,12 +231,12 @@ type PayrollOverride struct {
 
 // CompensationRate stores historical baseline rates for RN / PN.
 type CompensationRate struct {
-	ID             int64      `json:"id"`
-	Position       string     `json:"position"`
-	EveNightRate   float64    `json:"eveNightRate"`
-	OTRate         float64    `json:"otRate"`
-	EffectiveFrom  string     `json:"effectiveFrom"`
-	EffectiveTo    *string    `json:"effectiveTo,omitempty"`
-	CreatedAt      time.Time  `json:"createdAt"`
-	UpdatedAt      time.Time  `json:"updatedAt"`
+	ID            int64     `json:"id"`
+	Position      string    `json:"position"`
+	EveNightRate  float64   `json:"eveNightRate"`
+	OTRate        float64   `json:"otRate"`
+	EffectiveFrom string    `json:"effectiveFrom"`
+	EffectiveTo   *string   `json:"effectiveTo,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }

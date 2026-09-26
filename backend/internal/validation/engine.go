@@ -383,22 +383,7 @@ func Validate(r domain.Roster, original []domain.Cell) domain.Report {
 	// Sweep every interval boundary: coverage must hold throughout the entire staffing window.
 	for d := start; d.Before(end); d = d.AddDate(0, 0, 1) {
 		ds := d.Format("2006-01-02")
-		for _, req := range r.Policy.Staffing {
-			if req.Date != "" && req.Date != ds {
-				continue
-			}
-			if req.Date == "" {
-				overridden := false
-				for _, specific := range r.Policy.Staffing {
-					if specific.Date == ds && specific.Start == req.Start && specific.End == req.End {
-						overridden = true
-						break
-					}
-				}
-				if overridden {
-					continue
-				}
-			}
+		for _, req := range domain.StaffingForDate(r.Policy, ds) {
 			a, b := d.Add(time.Duration(req.Start)*time.Minute), d.Add(time.Duration(req.End)*time.Minute)
 			points := []time.Time{a, b}
 			for _, list := range periods {
@@ -473,23 +458,27 @@ func Validate(r domain.Roster, original []domain.Cell) domain.Report {
 						}
 					}
 					missingSkills := map[string]int{}
-					for skill, need := range req.Skills { if need > skills[skill] { missingSkills[skill] = need-skills[skill] } }
+					for skill, need := range req.Skills {
+						if need > skills[skill] {
+							missingSkills[skill] = need - skills[skill]
+						}
+					}
 					msg := "อัตรากำลังไม่ครบช่วงเวลา: " + strings.Join(missingParts, ", ")
 					add("MIN_STAFFING", "error", domain.Cell{Date: ds}, msg, map[string]any{
 						"start": points[i].Format(time.RFC3339),
-						"end": points[i+1].Format(time.RFC3339),
-						"rn": rn, "reqRN": targetRN,
+						"end":   points[i+1].Format(time.RFC3339),
+						"rn":    rn, "reqRN": targetRN,
 						"pn": pn, "reqPN": req.PN,
 						"leaders": leaders, "reqLeaders": req.Leaders,
-						"missingRN": targetRN - rn,
-						"missingPN": req.PN - pn,
-						"missingLeaders": req.Leaders-leaders,
-						"missingSkills": missingSkills,
+						"missingRN":      targetRN - rn,
+						"missingPN":      req.PN - pn,
+						"missingLeaders": req.Leaders - leaders,
+						"missingSkills":  missingSkills,
 					})
 				}
 				targetTotal := targetRN + req.PN
 				actualTotal := rn + pn
-				if targetTotal > 0 && actualTotal > targetTotal {
+				if actualTotal > targetTotal {
 					add("OVER_STAFFING", "warning", domain.Cell{Date: ds}, "อัตรากำลังเกินเป้าหมาย (เสี่ยงค่า OT เพิ่ม)", map[string]any{"start": points[i].Format(time.RFC3339), "end": points[i+1].Format(time.RFC3339), "actual": actualTotal, "target": targetTotal, "excess": actualTotal - targetTotal})
 				}
 			}

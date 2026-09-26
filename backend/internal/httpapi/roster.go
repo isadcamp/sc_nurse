@@ -335,8 +335,22 @@ func (a *API) setRosterPolicy(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &raw) {
 		return
 	}
-	for _, key := range []string{"minRestHours", "maxConsecutiveDays", "maxConsecutiveNights", "maxMonthlyHours", "maxContinuousHours", "maxDoubleShifts", "nightStart", "nightEnd", "fairnessHours", "targets", "preferences", "staffing"} {
+	for _, key := range []string{"minRestHours", "maxConsecutiveDays", "maxConsecutiveNights", "maxMonthlyHours", "maxContinuousHours", "maxDoubleShifts", "nightStart", "nightEnd", "fairnessHours", "targets", "preferences"} {
 		value, ok := raw[key]
+		if !ok || string(value) == "null" {
+			fail(w, repository.ErrInput)
+			return
+		}
+	}
+	modeRaw, _ := raw["staffingMode"]
+	if string(modeRaw) == `"weekly"` {
+		value, ok := raw["weeklyStaffing"]
+		if !ok || string(value) == "null" {
+			fail(w, repository.ErrInput)
+			return
+		}
+	} else {
+		value, ok := raw["staffing"]
 		if !ok || string(value) == "null" {
 			fail(w, repository.ErrInput)
 			return

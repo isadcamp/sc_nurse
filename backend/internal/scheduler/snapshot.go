@@ -103,7 +103,7 @@ func Readiness(r domain.Roster, simulation bool) (domain.ReadinessReport, error)
 		out.Issues = append(out.Issues, domain.ReadinessIssue{Code: code, Field: field, Date: date, NurseID: id, Message: msg, FixPath: path, Severity: "error"})
 	}
 	warn := func(code, field, date, id, msg, path string) {
-		out.Issues = append(out.Issues, domain.ReadinessIssue{Code:code, Field:field, Date:date, NurseID:id, Message:msg, FixPath:path, Severity:"warning"})
+		out.Issues = append(out.Issues, domain.ReadinessIssue{Code: code, Field: field, Date: date, NurseID: id, Message: msg, FixPath: path, Severity: "warning"})
 	}
 	if !validation.PolicyValid(r.Policy) {
 		add("POLICY_INVALID", "policy", "", "", "ค่ากฎไม่ถูกต้อง", "/settings/roster-policy")
@@ -150,7 +150,7 @@ func Readiness(r domain.Roster, simulation bool) (domain.ReadinessReport, error)
 	if active == 0 {
 		add("STAFF_MISSING", "staff", "", "", "ไม่มีบุคลากรที่ใช้งาน", "/staff")
 	}
-	if len(r.Policy.Staffing) == 0 {
+	if (r.Policy.StaffingMode == "weekly" && len(r.Policy.WeeklyStaffing) == 0) || (r.Policy.StaffingMode != "weekly" && len(r.Policy.Staffing) == 0) {
 		add("STAFFING_MISSING", "policy.staffing", "", "", "ยังไม่ได้กำหนดอัตรากำลัง", "/settings/staffing")
 	}
 	// Multi-dimensional workforce capacity check (leaves, allowed shifts, skills, double shifts, off)
@@ -221,14 +221,19 @@ func Readiness(r domain.Roster, simulation bool) (domain.ReadinessReport, error)
 		history[cellKey(c)] = true
 	}
 	precedingDateStr := a.AddDate(0, 0, -1).Format("2006-01-02")
-		for _, n := range r.Staff {
-		if !n.Active { continue }
+	for _, n := range r.Staff {
+		if !n.Active {
+			continue
+		}
 		if !history[precedingDateStr+"|"+n.ID] {
-			if simulation { warn("BOUNDARY_MISSING", "boundary", precedingDateStr, n.ID, "ไม่มีเวรวันก่อนหน้า ผลจำลองยังยืนยันรอยต่อเดือนไม่ได้", "/schedules/boundary")
-			} else { add("BOUNDARY_MISSING", "boundary", precedingDateStr, n.ID, "ต้องระบุเวรวันก่อนหน้าจริงของบุคลากร", "/schedules/boundary") }
+			if simulation {
+				warn("BOUNDARY_MISSING", "boundary", precedingDateStr, n.ID, "ไม่มีเวรวันก่อนหน้า ผลจำลองยังยืนยันรอยต่อเดือนไม่ได้", "/schedules/boundary")
+			} else {
+				add("BOUNDARY_MISSING", "boundary", precedingDateStr, n.ID, "ต้องระบุเวรวันก่อนหน้าจริงของบุคลากร", "/schedules/boundary")
+			}
 		}
 	}
-sort.Slice(out.Issues, func(i, j int) bool {
+	sort.Slice(out.Issues, func(i, j int) bool {
 		x, y := out.Issues[i], out.Issues[j]
 		return x.Code+x.Date+x.NurseID+x.Message < y.Code+y.Date+y.NurseID+y.Message
 	})

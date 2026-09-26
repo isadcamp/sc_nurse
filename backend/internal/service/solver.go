@@ -369,7 +369,10 @@ func (s *SolverService) Cancel(ctx context.Context, id string, a domain.Actor) (
 	s.mu.Unlock()
 	return j, nil
 }
-func solverResultCanApply(out *domain.SolverOutput) bool {
+func solverResultCanApply(r domain.Roster, out *domain.SolverOutput) bool {
+	if solverResultHasNoWork(r, out) {
+		return false
+	}
 	if len(out.Assignments) == 0 {
 		return false
 	}
@@ -386,6 +389,28 @@ func solverResultCanApply(out *domain.SolverOutput) bool {
 	return onlySolverOutputStaffingErrors(out)
 }
 
+// A result with demand but no working shifts must never replace the roster.
+func solverResultHasNoWork(r domain.Roster, out *domain.SolverOutput) bool {
+	if out == nil {
+		return true
+	}
+	month := time.Date(r.Year, time.Month(r.Month), 1, 0, 0, 0, 0, time.UTC)
+	demand := 0
+	for d := month; d.Month() == month.Month(); d = d.AddDate(0, 0, 1) {
+		for _, req := range domain.StaffingForDate(r.Policy, d.Format("2006-01-02")) {
+			demand += req.RN + req.PN + req.Leaders
+		}
+	}
+	if demand == 0 {
+		return false
+	}
+	for _, c := range out.Assignments {
+		if c.ShiftCode != "" && c.ShiftCode != "X" && c.ShiftCode != "L" {
+			return false
+		}
+	}
+	return true
+}
 func onlySolverOutputStaffingErrors(out *domain.SolverOutput) bool {
 	for _, v := range out.Violations {
 		if v.Severity != "error" {
@@ -419,7 +444,7 @@ func (s *SolverService) Apply(ctx context.Context, id string, a domain.Actor) (d
 	if !Allowed(a, j.WardID, true) {
 		return domain.Roster{}, repository.ErrForbidden
 	}
-	if j.Applied || j.Status != "completed" || j.Result == nil || !solverResultCanApply(j.Result) {
+	if j.Applied || j.Status != "completed" || j.Result == nil || !solverResultCanApply(j.Input.Snapshot.Roster, j.Result) {
 		return domain.Roster{}, repository.ErrConflict
 	}
 	roster, e := s.Roster.Store.Change(ctx, j.ScheduleID, func(r *domain.Roster) (domain.Audit, error) {
