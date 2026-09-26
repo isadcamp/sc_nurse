@@ -406,8 +406,30 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
         setError("อัตรากำลังรายสัปดาห์ไม่ครบหรือมีค่าที่ไม่ถูกต้อง");
         return;
       }
-      const payload = {
-        ...currentPolicy,
+      const cleanedWeeklyStaffing = weeklyStaffing.map((item) => ({
+        weekday: Number(item.weekday),
+        start: Number(item.start),
+        end: Number(item.end),
+        rn: Number(item.rn) || 0,
+        pn: Number(item.pn) || 0,
+        leaders: Number(item.leaders) || 0,
+        skills: item.skills && typeof item.skills === "object" ? item.skills : {},
+      }));
+
+      const cleanedTargets = targets.map((t) => ({
+        nurseId: String(t.nurseId),
+        hours: Number(t.hours) || 0,
+        off: Number(t.off) || 0,
+        quotas: t.quotas && typeof t.quotas === "object" ? t.quotas : {},
+      }));
+
+      const nightStartVal = currentPolicy.nightStart ?? 1320;
+      let nightEndVal = currentPolicy.nightEnd ?? 1800;
+      if (nightEndVal <= nightStartVal) {
+        nightEndVal += 1440;
+      }
+
+      const payload: Record<string, unknown> = {
         status: "confirmed",
         version: currentPolicy.version || "v1.0",
         effectiveFrom: currentPolicy.effectiveFrom || "2020-01-01",
@@ -421,8 +443,8 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
         maxMonthlyHours: Number(maxMonthlyHours),
         maxContinuousHours: Number(maxContinuousHours),
         maxDoubleShifts: Number(maxDoubleShifts),
-        nightStart: currentPolicy.nightStart ?? 1320,
-        nightEnd: currentPolicy.nightEnd ?? 1800,
+        nightStart: nightStartVal,
+        nightEnd: nightEndVal,
         fairnessHours: Number(fairnessHours),
         weights: {
           coverage: Number(wCoverage),
@@ -430,12 +452,25 @@ export function PolicyPanel({ roster, token, onSaved, onBackToGrid }: PolicyPane
           preference: Number(wPreference),
           stability: Number(wStability),
         },
-        targets,
+        targets: cleanedTargets,
         preferences: currentPolicy.preferences || [],
         staffing: parsedStaffing,
         staffingMode: scheduleMode,
-        weeklyStaffing,
+        weeklyStaffing: cleanedWeeklyStaffing,
       };
+
+      if (currentPolicy.compensation) {
+        payload.compensation = currentPolicy.compensation;
+      }
+      if (currentPolicy.minOff !== undefined) {
+        payload.minOff = currentPolicy.minOff;
+      }
+      if (currentPolicy.maxRolling24Hours !== undefined) {
+        payload.maxRolling24Hours = currentPolicy.maxRolling24Hours;
+      }
+      if (currentPolicy.maxRolling7DaysHours !== undefined) {
+        payload.maxRolling7DaysHours = currentPolicy.maxRolling7DaysHours;
+      }
 
       await request(`/wards/${encodeURIComponent(roster.wardId)}/roster-policy`, token, "PUT", payload);
       const updated = await request<RosterResponse>(`/schedules/${roster.id}`, token);

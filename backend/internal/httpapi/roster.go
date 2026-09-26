@@ -363,8 +363,13 @@ func (a *API) setRosterPolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	var p domain.Policy
 	d := json.NewDecoder(strings.NewReader(string(b)))
-	d.DisallowUnknownFields()
 	if err = d.Decode(&p); err != nil {
+		log.Printf("setRosterPolicy decode error: %v", err)
+		fail(w, repository.ErrInput)
+		return
+	}
+	if !validation.PolicyValid(p) {
+		log.Printf("setRosterPolicy validation failed for ward %s", r.PathValue("ward"))
 		fail(w, repository.ErrInput)
 		return
 	}

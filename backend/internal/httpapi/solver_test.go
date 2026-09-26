@@ -514,3 +514,57 @@ func TestGenerateMultiEndpoint(t *testing.T) {
 	}
 }
 
+func TestSetWeeklyPolicyEndpoint(t *testing.T) {
+	h, _ := solverSetup()
+	payload := `{
+		"status": "confirmed",
+		"version": "v1.0",
+		"effectiveFrom": "2020-01-01",
+		"effectiveTo": "2099-12-31",
+		"minRestHours": 8,
+		"maxConsecutiveDays": 6,
+		"maxConsecutiveNights": 3,
+		"maxConsecutiveOffDays": 2,
+		"compressOffOnShortage": true,
+		"allowOTOnShortage": true,
+		"maxMonthlyHours": 240,
+		"maxContinuousHours": 16,
+		"maxDoubleShifts": 8,
+		"nightStart": 1320,
+		"nightEnd": 1800,
+		"fairnessHours": 48,
+		"weights": {"coverage": 100, "fairness": 50, "preference": 20, "stability": 10},
+		"targets": [],
+		"preferences": [],
+		"staffing": [],
+		"staffingMode": "weekly",
+		"weeklyStaffing": [
+			{"weekday": 1, "start": 480, "end": 960, "rn": 2, "pn": 1, "leaders": 1, "skills": {}},
+			{"weekday": 1, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 1, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}},
+			{"weekday": 2, "start": 480, "end": 960, "rn": 2, "pn": 1, "leaders": 1, "skills": {}},
+			{"weekday": 2, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 2, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}},
+			{"weekday": 3, "start": 480, "end": 960, "rn": 2, "pn": 1, "leaders": 1, "skills": {}},
+			{"weekday": 3, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 3, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}},
+			{"weekday": 4, "start": 480, "end": 960, "rn": 2, "pn": 1, "leaders": 1, "skills": {}},
+			{"weekday": 4, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 4, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}},
+			{"weekday": 5, "start": 480, "end": 960, "rn": 2, "pn": 1, "leaders": 1, "skills": {}},
+			{"weekday": 5, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 5, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}},
+			{"weekday": 6, "start": 480, "end": 960, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 6, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 6, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}},
+			{"weekday": 7, "start": 480, "end": 960, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 7, "start": 960, "end": 1440, "rn": 1, "pn": 0, "leaders": 1, "skills": {}},
+			{"weekday": 7, "start": 0, "end": 480, "rn": 1, "pn": 0, "leaders": 0, "skills": {}}
+		]
+	}`
+	w := call(h, "PUT", "/api/v1/wards/test-ward/roster-policy", payload, headToken)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+

@@ -84,6 +84,8 @@ export interface Policy {
   effectiveFrom?: string;
   effectiveTo?: string;
   minOff?: number;
+  maxRolling24Hours?: number;
+  maxRolling7DaysHours?: number;
   minRestHours: number;
   maxConsecutiveDays: number;
   maxConsecutiveNights: number;
